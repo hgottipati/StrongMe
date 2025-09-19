@@ -1,0 +1,320 @@
+import SwiftUI
+
+struct SaveWorkoutView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    let workout: Workout
+    let originalWorkout: Workout
+    @State private var workoutName: String
+    @State private var workoutDescription: String = ""
+    @State private var showingUpdateRoutine = false
+    @State private var showingCelebration = false
+    @State private var hasWorkoutChanged: Bool = false
+    
+    init(workout: Workout, originalWorkout: Workout) {
+        self.workout = workout
+        self.originalWorkout = originalWorkout
+        self._workoutName = State(initialValue: workout.name)
+    }
+    
+    private var totalVolume: Double {
+        workout.exercises.flatMap { $0.sets }
+            .compactMap { set in
+                guard let weight = set.weight, let reps = set.reps else { return nil }
+                return weight * Double(reps)
+            }
+            .reduce(0, +)
+    }
+    
+    private var totalSets: Int {
+        workout.exercises.flatMap { $0.sets }.count
+    }
+    
+    private var workoutDuration: TimeInterval {
+        Date().timeIntervalSince(workout.date)
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Workout Name Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Workout Name")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        HStack {
+                            TextField("Enter workout name", text: $workoutName)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Button(action: {
+                                workoutName = ""
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Workout Summary
+                    VStack(spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Duration")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(formatDuration(workoutDuration))
+                                    .font(.headline)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .center, spacing: 4) {
+                                Text("Volume")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(Int(totalVolume)) lbs")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("Sets")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(totalSets)")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        
+                        // Date and Time
+                        HStack {
+                            Text("When")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(workout.date, style: .date)
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    // Media Attachment
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Add Media")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Button(action: {
+                            // Add photo/video functionality
+                        }) {
+                            HStack {
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                Text("Add a photo / video")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                                    .foregroundColor(.gray)
+                            )
+                        }
+                    }
+                    
+                    // Description Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Description")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextField("How did your workout go? Leave some notes here...", text: $workoutDescription, axis: .vertical)
+                            .lineLimit(3...6)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                    }
+                    
+                    // Settings Section
+                    VStack(spacing: 16) {
+                        SettingsRow(title: "Visibility", icon: "eye", color: .blue, action: {})
+                        SettingsRow(title: "Routine Settings", icon: "gear", color: .gray, action: {})
+                        SettingsRow(title: "Sync With", icon: "heart", color: .red, action: {})
+                    }
+                    
+                    // Discard Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Discard Workout")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.top, 20)
+                }
+                .padding()
+            }
+            .navigationTitle("Save Workout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveWorkout()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                }
+            }
+            .alert("Update '\(workout.name)'", isPresented: $showingUpdateRoutine) {
+                Button("Update Routine") {
+                    updateRoutine()
+                }
+                Button("Keep Original Routine") {
+                    keepOriginalRoutine()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                let addedExercises = workout.exercises.count - originalWorkout.exercises.count
+                let removedExercises = originalWorkout.exercises.count - workout.exercises.count
+                
+                if addedExercises > 0 {
+                    Text("You added \(addedExercises) exercise\(addedExercises == 1 ? "" : "s") to this workout.")
+                } else if removedExercises > 0 {
+                    Text("You removed \(removedExercises) exercise\(removedExercises == 1 ? "" : "s") from this workout.")
+                } else {
+                    Text("You made changes to this workout (reordered exercises or changed details).")
+                }
+            }
+            .fullScreenCover(isPresented: $showingCelebration) {
+                WorkoutCelebrationView(workout: workout)
+                    .environmentObject(dataManager)
+            }
+            .onAppear {
+                detectChanges()
+            }
+        }
+    }
+    
+    private func detectChanges() {
+        print("DEBUG: SaveWorkoutView - Original workout has \(originalWorkout.exercises.count) exercises")
+        print("DEBUG: SaveWorkoutView - Current workout has \(workout.exercises.count) exercises")
+        
+        // Check if exercises were added/removed during the workout
+        let exerciseCountChanged = workout.exercises.count != originalWorkout.exercises.count
+        print("DEBUG: SaveWorkoutView - exerciseCountChanged: \(exerciseCountChanged)")
+        
+        // Check if any exercise content changed (different exercises)
+        var exerciseContentChanged = false
+        if workout.exercises.count == originalWorkout.exercises.count {
+            for (index, currentExercise) in workout.exercises.enumerated() {
+                if index < originalWorkout.exercises.count {
+                    let originalExercise = originalWorkout.exercises[index]
+                    if currentExercise.exercise.id != originalExercise.exercise.id {
+                        print("DEBUG: SaveWorkoutView - Exercise at index \(index) changed from '\(originalExercise.exercise.name)' to '\(currentExercise.exercise.name)'")
+                        exerciseContentChanged = true
+                        break
+                    }
+                }
+            }
+        }
+        
+        hasWorkoutChanged = exerciseCountChanged || exerciseContentChanged
+        print("DEBUG: SaveWorkoutView - exerciseContentChanged: \(exerciseContentChanged)")
+        print("DEBUG: SaveWorkoutView - hasWorkoutChanged: \(hasWorkoutChanged)")
+        
+        // Log alert message details
+        let addedExercises = workout.exercises.count - originalWorkout.exercises.count
+        let removedExercises = originalWorkout.exercises.count - workout.exercises.count
+        print("DEBUG: Alert message - Original: \(originalWorkout.exercises.count), Current: \(workout.exercises.count)")
+        print("DEBUG: Alert message - Added: \(addedExercises), Removed: \(removedExercises)")
+    }
+    
+    private func saveWorkout() {
+        // Check if workout was modified
+        if hasWorkoutChanged {
+            showingUpdateRoutine = true
+        } else {
+            finalizeWorkout()
+        }
+    }
+    
+    private func updateRoutine() {
+        // Update the routine with changes
+        finalizeWorkout()
+    }
+    
+    private func keepOriginalRoutine() {
+        // Keep original routine, just save the workout
+        finalizeWorkout()
+    }
+    
+    private func finalizeWorkout() {
+        // Save the workout with updated name and description
+        var updatedWorkout = workout
+        updatedWorkout.name = workoutName
+        
+        // Update in data manager
+        if let index = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) {
+            dataManager.workouts[index] = updatedWorkout
+        }
+        
+        // Navigate to celebration screen
+        showingCelebration = true
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration) / 3600
+        let minutes = Int(duration) % 3600 / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)min"
+        } else {
+            return "\(minutes)min"
+        }
+    }
+}
+
+
+#Preview {
+    let sampleWorkout = Workout(
+        name: "Monday Workout",
+        exercises: [
+            WorkoutExercise(
+                exercise: Exercise(name: "Bench Press", category: .strength, muscleGroups: [.chest]),
+                sets: [
+                    Set(reps: 10, weight: 135, order: 1),
+                    Set(reps: 8, weight: 155, order: 2)
+                ],
+                order: 0
+            )
+        ]
+    )
+    
+    return SaveWorkoutView(workout: sampleWorkout, originalWorkout: sampleWorkout)
+        .environmentObject(DataManager())
+}
