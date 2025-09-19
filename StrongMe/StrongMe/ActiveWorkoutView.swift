@@ -12,12 +12,12 @@ struct ActiveWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     
     let workout: Workout
+    let onWorkoutComplete: (() -> Void)?
     @State private var currentWorkout: Workout
     @State private var currentExerciseIndex = 0
     @State private var currentSetIndex = 0
     @State private var restTimer: Timer?
     @State private var restTimeRemaining: TimeInterval = 0
-    @State private var showingEndWorkout = false
     @State private var showingAddExercise = false
     @State private var showingDiscardConfirmation = false
     @State private var showingExerciseOptions = false
@@ -25,8 +25,9 @@ struct ActiveWorkoutView: View {
     @State private var showingSaveWorkout = false
     @FocusState private var isKeyboardVisible: Bool
     
-    init(workout: Workout) {
+    init(workout: Workout, onWorkoutComplete: (() -> Void)? = nil) {
         self.workout = workout
+        self.onWorkoutComplete = onWorkoutComplete
         self._currentWorkout = State(initialValue: workout)
     }
     
@@ -133,18 +134,6 @@ struct ActiveWorkoutView: View {
                                     .cornerRadius(12)
                                 }
                             }
-                            
-                            Button(action: finishWorkout) {
-                                HStack {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Finish Workout")
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                            }
                         }
                     }
                     .padding()
@@ -153,10 +142,12 @@ struct ActiveWorkoutView: View {
             .navigationTitle(currentWorkout.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("End") {
-                        showingEndWorkout = true
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Finish Workout") { 
+                        finishWorkout()
                     }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
                 }
             }
             .toolbar {
@@ -166,14 +157,6 @@ struct ActiveWorkoutView: View {
                         hideKeyboard()
                     }
                 }
-            }
-            .alert("End Workout", isPresented: $showingEndWorkout) {
-                Button("Cancel", role: .cancel) { }
-                Button("End Workout", role: .destructive) {
-                    finishWorkout()
-                }
-            } message: {
-                Text("Are you sure you want to end this workout? Your progress will be saved.")
             }
             .alert("Discard Workout", isPresented: $showingDiscardConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -207,8 +190,11 @@ struct ActiveWorkoutView: View {
                 .environmentObject(dataManager)
             }
             .sheet(isPresented: $showingSaveWorkout) {
-                SaveWorkoutView(workout: currentWorkout, originalWorkout: workout)
-                    .environmentObject(dataManager)
+                SaveWorkoutView(workout: currentWorkout, originalWorkout: workout, onComplete: {
+                    // Call the workout completion callback to dismiss the entire flow
+                    onWorkoutComplete?()
+                })
+                .environmentObject(dataManager)
             }
         }
     }

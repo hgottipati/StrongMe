@@ -104,7 +104,10 @@ struct WorkoutDetailView: View {
                 EditWorkoutView(workout: currentWorkout)
             }
             .sheet(isPresented: $showingStartWorkout) {
-                ActiveWorkoutView(workout: currentWorkout)
+                ActiveWorkoutView(workout: currentWorkout, onWorkoutComplete: {
+                    // Dismiss the ActiveWorkoutView when workout is complete
+                    showingStartWorkout = false
+                })
             }
         }
     }

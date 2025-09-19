@@ -3,9 +3,9 @@ import SwiftUI
 struct WorkoutCelebrationView: View {
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.dismiss) private var dismiss
-    @State private var showingMainView = false
     
     let workout: Workout
+    let onComplete: () -> Void
     @State private var workoutStreak: Int = 5
     @State private var weeklyWorkouts: Int = 2
     @State private var showingShareSheet = false
@@ -232,8 +232,8 @@ struct WorkoutCelebrationView: View {
             // Done Button
             VStack {
                 Button(action: {
-                    // Dismiss all the way back to main view
-                    showingMainView = true
+                    // Call the completion callback to dismiss the entire workout flow
+                    onComplete()
                 }) {
                     Text("Done")
                         .font(.headline)
@@ -248,10 +248,6 @@ struct WorkoutCelebrationView: View {
                 .padding(.bottom, 34) // Account for home indicator
             }
             .background(Color(.systemBackground))
-            .fullScreenCover(isPresented: $showingMainView) {
-                ContentView()
-                    .environmentObject(dataManager)
-            }
         }
         .background(Color(.systemGray6))
         .sheet(isPresented: $showingShareSheet) {
@@ -330,6 +326,8 @@ struct ShareSheet: UIViewControllerRepresentable {
                 order: 0
             )
         ]
-    ))
+    ), onComplete: {
+        print("Workout completed!")
+    })
     .environmentObject(DataManager())
 }

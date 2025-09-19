@@ -6,15 +6,17 @@ struct SaveWorkoutView: View {
     
     let workout: Workout
     let originalWorkout: Workout
+    let onComplete: (() -> Void)?
     @State private var workoutName: String
     @State private var workoutDescription: String = ""
     @State private var showingUpdateRoutine = false
     @State private var showingCelebration = false
     @State private var hasWorkoutChanged: Bool = false
     
-    init(workout: Workout, originalWorkout: Workout) {
+    init(workout: Workout, originalWorkout: Workout, onComplete: (() -> Void)? = nil) {
         self.workout = workout
         self.originalWorkout = originalWorkout
+        self.onComplete = onComplete
         self._workoutName = State(initialValue: workout.name)
     }
     
@@ -211,8 +213,11 @@ struct SaveWorkoutView: View {
                 }
             }
             .fullScreenCover(isPresented: $showingCelebration) {
-                WorkoutCelebrationView(workout: workout)
-                    .environmentObject(dataManager)
+                WorkoutCelebrationView(workout: workout, onComplete: {
+                    // Call the completion callback to dismiss the entire workout flow
+                    onComplete?()
+                })
+                .environmentObject(dataManager)
             }
             .onAppear {
                 detectChanges()
@@ -278,10 +283,8 @@ struct SaveWorkoutView: View {
         var updatedWorkout = workout
         updatedWorkout.name = workoutName
         
-        // Update in data manager
-        if let index = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) {
-            dataManager.workouts[index] = updatedWorkout
-        }
+        // Use DataManager's saveWorkout method to properly update the state
+        dataManager.saveWorkout(updatedWorkout)
         
         // Navigate to celebration screen
         showingCelebration = true
@@ -315,6 +318,8 @@ struct SaveWorkoutView: View {
         ]
     )
     
-    return SaveWorkoutView(workout: sampleWorkout, originalWorkout: sampleWorkout)
+    return SaveWorkoutView(workout: sampleWorkout, originalWorkout: sampleWorkout, onComplete: {
+        print("Workout completed!")
+    })
         .environmentObject(DataManager())
 }
