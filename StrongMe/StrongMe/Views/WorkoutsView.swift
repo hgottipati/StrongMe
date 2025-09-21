@@ -217,9 +217,9 @@ struct WorkoutsView: View {
                             
                             // Content based on selected tab
                             if selectedTab == .adhoc {
-                                AdhocWorkoutsView(dataManager: dataManager, draggedWorkout: $draggedWorkout, dragOffset: $dragOffset, selectedWorkout: $selectedWorkout, showingWorkoutOverview: $showingWorkoutOverview)
+                                AdhocWorkoutsView(draggedWorkout: $draggedWorkout, dragOffset: $dragOffset, selectedWorkout: $selectedWorkout, showingWorkoutOverview: $showingWorkoutOverview)
                             } else {
-                                RoutinesView(dataManager: dataManager)
+                                RoutinesView()
                             }
                         }
                         .padding(.horizontal, 16)
@@ -607,7 +607,7 @@ struct WeeklyOverviewSection: View {
 // MARK: - Modern Workout Card View
 struct ModernWorkoutCardView: View {
     let workout: Workout
-    let dataManager: DataManager
+    @EnvironmentObject var dataManager: DataManager
     let onTap: () -> Void
     let onStartWorkout: () -> Void
     let onShare: () -> Void
@@ -824,7 +824,7 @@ struct ModernWorkoutCardView: View {
 // MARK: - Workout Drop Delegate
 struct WorkoutDropDelegate: DropDelegate {
     let workout: Workout
-    let dataManager: DataManager
+    @EnvironmentObject var dataManager: DataManager
     @Binding var draggedWorkout: Workout?
     @Binding var dragOffset: CGSize
     
@@ -914,7 +914,6 @@ struct AdhocWorkoutsView: View {
             ForEach(Array(dataManager.workouts.enumerated()), id: \.element.id) { index, workout in
                 ModernWorkoutCardView(
                     workout: workout,
-                    dataManager: dataManager,
                     onTap: {
                         selectedWorkout = workout
                     },
@@ -943,7 +942,6 @@ struct AdhocWorkoutsView: View {
                 }
                 .onDrop(of: [.text], delegate: WorkoutDropDelegate(
                     workout: workout,
-                    dataManager: dataManager,
                     draggedWorkout: $draggedWorkout,
                     dragOffset: $dragOffset
                 ))
@@ -1096,12 +1094,12 @@ struct RoutinesView: View {
                 }
             } else {
                 ForEach(dataManager.routines) { routine in
-                    RoutineCardView(routine: routine, dataManager: dataManager)
+                    RoutineCardView(routine: routine)
                 }
             }
         }
         .sheet(isPresented: $showingNewRoutine) {
-            NewRoutineView(dataManager: dataManager)
+            NewRoutineView()
         }
     }
 }
@@ -1192,7 +1190,7 @@ struct RoutineCardView: View {
                 .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
         )
         .sheet(isPresented: $showingRoutineDetail) {
-            RoutineDetailView(routine: routine, dataManager: dataManager)
+            RoutineDetailView(routine: routine)
         }
     }
 }

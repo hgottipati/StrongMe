@@ -86,6 +86,12 @@ class DataManager: ObservableObject {
         print("DEBUG: DataManager.saveWorkout - Data saved to persistence")
     }
     
+    func addWorkout(_ workout: Workout) {
+        workouts.append(workout)
+        persistenceManager.saveWorkouts(workouts)
+        print("DEBUG: DataManager.addWorkout - Added workout: \(workout.name)")
+    }
+    
     func deleteWorkout(_ workout: Workout) {
         workouts.removeAll { $0.id == workout.id }
         persistenceManager.saveWorkouts(workouts)
