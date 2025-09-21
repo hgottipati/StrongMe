@@ -89,73 +89,73 @@ struct WorkoutsView: View {
     }
     
     private func startWorkout(_ workout: Workout) {
-        print("DEBUG: WorkoutsView - Starting workout: \(workout.name)")
-        print("DEBUG: WorkoutsView - Workout ID: \(workout.id)")
-        print("DEBUG: WorkoutsView - Exercise count: \(workout.exercises.count)")
+                                        print("DEBUG: WorkoutsView - Starting workout: \(workout.name)")
+                                        print("DEBUG: WorkoutsView - Workout ID: \(workout.id)")
+                                        print("DEBUG: WorkoutsView - Exercise count: \(workout.exercises.count)")
         
-        for (exIndex, exercise) in workout.exercises.enumerated() {
-            print("DEBUG: WorkoutsView - Exercise \(exIndex): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
-            for (setIndex, set) in exercise.sets.enumerated() {
-                print("DEBUG: WorkoutsView -   Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
-            }
-        }
-        
-        // Find the most recent modified workout with the same name
-        let recentModifiedWorkout = dataManager.workouts
-            .filter { $0.name == workout.name && $0.id != workout.id }
-            .filter { w in
-                w.exercises.contains { exercise in
-                    exercise.sets.contains { set in
-                        (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
-                    }
-                }
-            }
-            .sorted { $0.date > $1.date }
-            .first
-        
-        if let recentWorkout = recentModifiedWorkout {
-            print("DEBUG: WorkoutsView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
-            print("DEBUG: WorkoutsView - Recent workout sets:")
-            for exercise in recentWorkout.exercises {
-                print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
-                for (setIndex, set) in exercise.sets.enumerated() {
-                    print("DEBUG: WorkoutsView -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
-                }
-            }
-            // Create a new workout instance based on the recent workout's structure, but with fresh completion states
-            let newWorkout = Workout(
-                name: recentWorkout.name,
-                exercises: recentWorkout.exercises.map { exercise in
-                    WorkoutExercise(
-                        exercise: exercise.exercise,
-                        sets: exercise.sets.map { set in
-                            Set(
+                                        for (exIndex, exercise) in workout.exercises.enumerated() {
+                                            print("DEBUG: WorkoutsView - Exercise \(exIndex): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                                            for (setIndex, set) in exercise.sets.enumerated() {
+                                                print("DEBUG: WorkoutsView -   Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                            }
+                                        }
+                                        
+                                        // Find the most recent modified workout with the same name
+                                        let recentModifiedWorkout = dataManager.workouts
+                                            .filter { $0.name == workout.name && $0.id != workout.id }
+                                            .filter { w in
+                                                w.exercises.contains { exercise in
+                                                    exercise.sets.contains { set in
+                                                        (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
+                                                    }
+                                                }
+                                            }
+                                            .sorted { $0.date > $1.date }
+                                            .first
+                                        
+                                        if let recentWorkout = recentModifiedWorkout {
+                                            print("DEBUG: WorkoutsView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
+                                            print("DEBUG: WorkoutsView - Recent workout sets:")
+                                            for exercise in recentWorkout.exercises {
+                                                print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                                                for (setIndex, set) in exercise.sets.enumerated() {
+                                                    print("DEBUG: WorkoutsView -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                                }
+                                            }
+                                            // Create a new workout instance based on the recent workout's structure, but with fresh completion states
+                                            let newWorkout = Workout(
+                                                name: recentWorkout.name,
+                                                exercises: recentWorkout.exercises.map { exercise in
+                                                    WorkoutExercise(
+                                                        exercise: exercise.exercise,
+                                                        sets: exercise.sets.map { set in
+                                                            Set(
                                 reps: set.reps,
                                 weight: set.weight,
-                                duration: set.duration,
-                                distance: set.distance,
-                                restTime: set.restTime,
+                                                                duration: set.duration,
+                                                                distance: set.distance,
+                                                                restTime: set.restTime,
                                 isCompleted: false, // Reset completion state
-                                order: set.order
-                            )
-                        },
-                        order: exercise.order
-                    )
-                },
+                                                                order: set.order
+                                                            )
+                                                        },
+                                                        order: exercise.order
+                                                    )
+                                                },
                 date: Date(),
                 duration: 0,
-                notes: recentWorkout.notes,
-                isTemplate: false
-            )
-            
+                                                notes: recentWorkout.notes,
+                                                isTemplate: false
+                                            )
+                                            
             print("DEBUG: WorkoutsView - Created new workout based on recent workout with ID: \(newWorkout.id)")
             
             // Start the workout session with the new workout
             dataManager.startWorkout(newWorkout)
             
             // Navigate to active workout view
-            showingWorkoutOverview = newWorkout
-        } else {
+                                            showingWorkoutOverview = newWorkout
+                                        } else {
             // Create a copy of the workout for the active session
             let activeWorkout = Workout(
                 name: workout.name,
@@ -866,6 +866,7 @@ struct AdhocWorkoutsView: View {
     @Binding var dragOffset: CGSize
     @Binding var selectedWorkout: Workout?
     @Binding var showingWorkoutOverview: Workout?
+    @State private var lastReorderIndex: Int? = nil
     
     var body: some View {
         LazyVStack(spacing: 16) {
@@ -914,7 +915,7 @@ struct AdhocWorkoutsView: View {
                                     dragOffset = constrainedOffset
                                     
                                     // Check if we should reorder based on vertical position
-                                    checkForReorder(workout: workout, dragOffset: constrainedOffset)
+                                    checkForReorder(dragOffset: constrainedOffset)
                                 }
                                 
                             default:
@@ -925,6 +926,7 @@ struct AdhocWorkoutsView: View {
                             // Reset drag state
                             draggedWorkout = nil
                             dragOffset = .zero
+                            lastReorderIndex = nil
                             
                             // Provide success feedback
                             let successFeedback = UINotificationFeedbackGenerator()
@@ -938,34 +940,31 @@ struct AdhocWorkoutsView: View {
         }
     }
     
-    private func checkForReorder(workout: Workout, dragOffset: CGSize) {
-        guard let draggedWorkout = draggedWorkout,
-              draggedWorkout.id != workout.id else { return }
+    private func checkForReorder(dragOffset: CGSize) {
+        guard let draggedWorkout = draggedWorkout else { return }
         
-        // Calculate the threshold for reordering (half the card height)
-        let reorderThreshold: CGFloat = 60
+        // Calculate the threshold for reordering (card height)
+        let reorderThreshold: CGFloat = 80
         
         // Check if the dragged card has moved enough to trigger a reorder
         if abs(dragOffset.height) > reorderThreshold {
-            // Determine direction of movement
-            let shouldMoveUp = dragOffset.height < -reorderThreshold
-            let shouldMoveDown = dragOffset.height > reorderThreshold
+            // Find current position of dragged workout
+            guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }) else { return }
             
-            if shouldMoveUp || shouldMoveDown {
-                // Find current positions
-                guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }),
-                      let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) else { return }
-                
-                // Calculate new position
-                let newIndex: Int
-                if shouldMoveUp && draggedIndex > targetIndex {
-                    newIndex = max(0, targetIndex)
-                } else if shouldMoveDown && draggedIndex < targetIndex {
-                    newIndex = min(dataManager.workouts.count - 1, targetIndex)
-                } else {
-                    return // No reorder needed
-                }
-                
+            // Calculate new position based on drag direction
+            let newIndex: Int
+            if dragOffset.height < -reorderThreshold {
+                // Moving up - move to previous position
+                newIndex = max(0, draggedIndex - 1)
+            } else if dragOffset.height > reorderThreshold {
+                // Moving down - move to next position
+                newIndex = min(dataManager.workouts.count - 1, draggedIndex + 1)
+            } else {
+                return // No reorder needed
+            }
+            
+            // Only reorder if the new position is different and valid, and we haven't already reordered to this position
+            if newIndex != draggedIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && lastReorderIndex != newIndex {
                 // Perform the reorder with animation
                 withAnimation(.easeInOut(duration: 0.3)) {
                     dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: newIndex)
@@ -974,6 +973,9 @@ struct AdhocWorkoutsView: View {
                 // Provide haptic feedback for reorder
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                 impactFeedback.impactOccurred()
+                
+                // Track this reorder to prevent multiple reorders to the same position
+                lastReorderIndex = newIndex
             }
         }
     }
