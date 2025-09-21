@@ -39,6 +39,7 @@ class DragAndDropTests: XCTestCase {
         // When
         let dropDelegate = WorkoutDropDelegate(
             workout: workout,
+            dataManager: dataManager,
             draggedWorkout: draggedWorkout,
             dragOffset: dragOffset
         )
@@ -67,6 +68,7 @@ class DragAndDropTests: XCTestCase {
         
         let dropDelegate = WorkoutDropDelegate(
             workout: workout2,
+            dataManager: dataManager,
             draggedWorkout: draggedWorkout,
             dragOffset: dragOffset
         )
@@ -97,6 +99,7 @@ class DragAndDropTests: XCTestCase {
         
         let dropDelegate = WorkoutDropDelegate(
             workout: workout,
+            dataManager: dataManager,
             draggedWorkout: draggedWorkout,
             dragOffset: dragOffset
         )
@@ -118,6 +121,7 @@ class DragAndDropTests: XCTestCase {
         let workout = createSampleWorkout()
         let dropDelegate = WorkoutDropDelegate(
             workout: workout,
+            dataManager: dataManager,
             draggedWorkout: .constant(nil),
             dragOffset: .constant(.zero)
         )
