@@ -898,7 +898,7 @@ struct AdhocWorkoutsView: View {
                     DragGesture()
                         .onChanged { value in
                             // Only allow vertical movement (constrain X to 0)
-                            let constrainedOffset = CGSize(width: 0, height: value.translation.y)
+                            let constrainedOffset = CGSize(width: 0, height: value.translation.height)
                             dragOffset = constrainedOffset
                             
                             if draggedWorkout == nil {
@@ -936,10 +936,10 @@ struct AdhocWorkoutsView: View {
         let reorderThreshold: CGFloat = 60
         
         // Check if the dragged card has moved enough to trigger a reorder
-        if abs(dragOffset.y) > reorderThreshold {
+        if abs(dragOffset.height) > reorderThreshold {
             // Determine direction of movement
-            let shouldMoveUp = dragOffset.y < -reorderThreshold
-            let shouldMoveDown = dragOffset.y > reorderThreshold
+            let shouldMoveUp = dragOffset.height < -reorderThreshold
+            let shouldMoveDown = dragOffset.height > reorderThreshold
             
             if shouldMoveUp || shouldMoveDown {
                 // Find current positions
