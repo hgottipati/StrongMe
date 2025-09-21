@@ -10,7 +10,9 @@ This directory contains comprehensive unit tests for the StrongMe app to ensure 
 2. **DataManagerTests.swift** - Tests for DataManager core functionality
 3. **WorkoutModelTests.swift** - Tests for Workout, Routine, and related models
 4. **PersistenceManagerTests.swift** - Tests for data persistence layer
-5. **TestRunner.swift** - Manual test runner for verification
+5. **EnvironmentObjectTests.swift** - Tests for EnvironmentObject injection and SwiftUI architecture
+6. **DragAndDropTests.swift** - Tests for drag and drop functionality and reordering
+7. **TestRunner.swift** - Manual test runner for verification
 
 ## Test Coverage
 
@@ -35,6 +37,23 @@ This directory contains comprehensive unit tests for the StrongMe app to ensure 
 - ✅ Empty data handling
 - ✅ Complex data structures
 - ✅ Data integrity verification
+
+### EnvironmentObject Tests
+- ✅ DataManager EnvironmentObject injection
+- ✅ SwiftUI view hierarchy with EnvironmentObject
+- ✅ TabView EnvironmentObject propagation
+- ✅ All view components with EnvironmentObject
+- ✅ Drag and drop components EnvironmentObject
+- ✅ Complete workflow integration tests
+
+### Drag and Drop Tests
+- ✅ WorkoutDropDelegate functionality
+- ✅ Drag state management
+- ✅ Workout reordering operations
+- ✅ Visual feedback calculations
+- ✅ NSItemProvider creation
+- ✅ Multiple workout reordering
+- ✅ Drop operations and haptic feedback
 
 ## Running Tests
 
