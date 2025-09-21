@@ -821,49 +821,7 @@ struct ModernWorkoutCardView: View {
     }
 }
 
-// MARK: - Workout Drop Delegate
-struct WorkoutDropDelegate: DropDelegate {
-    let workout: Workout
-    let dataManager: DataManager
-    @Binding var draggedWorkout: Workout?
-    @Binding var dragOffset: CGSize
-    
-    func dropEntered(info: DropInfo) {
-        guard let draggedWorkout = draggedWorkout,
-              draggedWorkout.id != workout.id else { return }
-        
-        // Provide haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        // Move the dragged workout to the position of the drop target
-        withAnimation(.easeInOut(duration: 0.3)) {
-            if let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }),
-               let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) {
-                dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: targetIndex)
-            }
-        }
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        // Reset drag state
-        draggedWorkout = nil
-        dragOffset = .zero
-        
-        // Provide success haptic feedback
-        let successFeedback = UINotificationFeedbackGenerator()
-        successFeedback.notificationOccurred(.success)
-        
-        // Save the changes
-        dataManager.saveWorkoutsDirectly(dataManager.workouts)
-        
-        return true
-    }
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-}
+// MARK: - Workout Drop Delegate (Removed - using custom DragGesture instead)
 
 // MARK: - Tab Interface
 struct TabInterface: View {
@@ -936,16 +894,76 @@ struct AdhocWorkoutsView: View {
                 .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
                 .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
                 .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
-                .onDrag {
-                    draggedWorkout = workout
-                    return NSItemProvider(object: workout.id.uuidString as NSString)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            // Only allow vertical movement (constrain X to 0)
+                            let constrainedOffset = CGSize(width: 0, height: value.translation.y)
+                            dragOffset = constrainedOffset
+                            
+                            if draggedWorkout == nil {
+                                draggedWorkout = workout
+                                // Provide haptic feedback when drag starts
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                            }
+                            
+                            // Check if we should reorder based on vertical position
+                            checkForReorder(workout: workout, dragOffset: constrainedOffset)
+                        }
+                        .onEnded { value in
+                            // Reset drag state
+                            draggedWorkout = nil
+                            dragOffset = .zero
+                            
+                            // Provide success feedback
+                            let successFeedback = UINotificationFeedbackGenerator()
+                            successFeedback.notificationOccurred(.success)
+                            
+                            // Save the changes
+                            dataManager.saveWorkoutsDirectly(dataManager.workouts)
+                        }
+                )
+            }
+        }
+    }
+    
+    private func checkForReorder(workout: Workout, dragOffset: CGSize) {
+        guard let draggedWorkout = draggedWorkout,
+              draggedWorkout.id != workout.id else { return }
+        
+        // Calculate the threshold for reordering (half the card height)
+        let reorderThreshold: CGFloat = 60
+        
+        // Check if the dragged card has moved enough to trigger a reorder
+        if abs(dragOffset.y) > reorderThreshold {
+            // Determine direction of movement
+            let shouldMoveUp = dragOffset.y < -reorderThreshold
+            let shouldMoveDown = dragOffset.y > reorderThreshold
+            
+            if shouldMoveUp || shouldMoveDown {
+                // Find current positions
+                guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }),
+                      let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) else { return }
+                
+                // Calculate new position
+                let newIndex: Int
+                if shouldMoveUp && draggedIndex > targetIndex {
+                    newIndex = max(0, targetIndex)
+                } else if shouldMoveDown && draggedIndex < targetIndex {
+                    newIndex = min(dataManager.workouts.count - 1, targetIndex)
+                } else {
+                    return // No reorder needed
                 }
-                .onDrop(of: [.text], delegate: WorkoutDropDelegate(
-                    workout: workout,
-                    dataManager: dataManager,
-                    draggedWorkout: $draggedWorkout,
-                    dragOffset: $dragOffset
-                ))
+                
+                // Perform the reorder with animation
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: newIndex)
+                }
+                
+                // Provide haptic feedback for reorder
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
             }
         }
     }
