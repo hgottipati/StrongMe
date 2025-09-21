@@ -895,21 +895,31 @@ struct AdhocWorkoutsView: View {
                 .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
                 .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
                 .gesture(
-                    DragGesture()
+                    LongPressGesture(minimumDuration: 0.3)
+                        .sequenced(before: DragGesture())
                         .onChanged { value in
-                            // Only allow vertical movement (constrain X to 0)
-                            let constrainedOffset = CGSize(width: 0, height: value.translation.height)
-                            dragOffset = constrainedOffset
-                            
-                            if draggedWorkout == nil {
+                            switch value {
+                            case .first(true):
+                                // Long press started
                                 draggedWorkout = workout
-                                // Provide haptic feedback when drag starts
+                                // Provide haptic feedback when long press starts
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                                 impactFeedback.impactOccurred()
+                                
+                            case .second(true, let drag):
+                                // Long press + drag started
+                                if let dragValue = drag {
+                                    // Only allow vertical movement (constrain X to 0)
+                                    let constrainedOffset = CGSize(width: 0, height: dragValue.translation.height)
+                                    dragOffset = constrainedOffset
+                                    
+                                    // Check if we should reorder based on vertical position
+                                    checkForReorder(workout: workout, dragOffset: constrainedOffset)
+                                }
+                                
+                            default:
+                                break
                             }
-                            
-                            // Check if we should reorder based on vertical position
-                            checkForReorder(workout: workout, dragOffset: constrainedOffset)
                         }
                         .onEnded { value in
                             // Reset drag state
