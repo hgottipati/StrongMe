@@ -72,4 +72,19 @@ class PersistenceManager {
         }
         return user
     }
+    
+    // MARK: - Routine Persistence
+    func saveRoutines(_ routines: [Routine]) {
+        if let data = try? JSONEncoder().encode(routines) {
+            UserDefaults.standard.set(data, forKey: "routines")
+        }
+    }
+    
+    func loadRoutines() -> [Routine] {
+        guard let data = UserDefaults.standard.data(forKey: "routines"),
+              let routines = try? JSONDecoder().decode([Routine].self, from: data) else {
+            return []
+        }
+        return routines
+    }
 }

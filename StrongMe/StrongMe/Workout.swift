@@ -61,3 +61,37 @@ struct Set: Identifiable, Codable {
         self.order = order
     }
 }
+
+// MARK: - Routine Model
+struct Routine: Identifiable, Codable {
+    let id = UUID()
+    var name: String
+    var days: [RoutineDay]
+    var isActive: Bool = true
+    var createdDate: Date = Date()
+    var notes: String?
+    
+    init(name: String, days: [RoutineDay] = [], isActive: Bool = true, notes: String? = nil) {
+        self.name = name
+        self.days = days
+        self.isActive = isActive
+        self.notes = notes
+    }
+}
+
+struct RoutineDay: Identifiable, Codable {
+    let id = UUID()
+    var dayNumber: Int // 1, 2, 3, etc.
+    var dayName: String // "Day 1", "Day 2", etc.
+    var workout: Workout?
+    var isRestDay: Bool = false
+    var notes: String?
+    
+    init(dayNumber: Int, dayName: String? = nil, workout: Workout? = nil, isRestDay: Bool = false, notes: String? = nil) {
+        self.dayNumber = dayNumber
+        self.dayName = dayName ?? "Day \(dayNumber)"
+        self.workout = workout
+        self.isRestDay = isRestDay
+        self.notes = notes
+    }
+}

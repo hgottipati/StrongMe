@@ -1,6 +1,15 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum WorkoutTab: String, CaseIterable {
+    case adhoc = "Adhoc"
+    case routines = "Routines"
+    
+    var displayName: String {
+        return self.rawValue
+    }
+}
+
 struct WorkoutsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingNewWorkout = false
@@ -12,6 +21,9 @@ struct WorkoutsView: View {
     // Drag and drop state
     @State private var draggedWorkout: Workout? = nil
     @State private var dragOffset: CGSize = .zero
+    
+    // Tab state
+    @State private var selectedTab: WorkoutTab = .adhoc
     
     // MARK: - Action Functions
     private func shareWorkout(_ workout: Workout) {
@@ -200,43 +212,14 @@ struct WorkoutsView: View {
                             // Weekly Overview Section
                             WeeklyOverviewSection(dataManager: dataManager)
                             
-                            // Workouts List
-                            ForEach(Array(dataManager.workouts.enumerated()), id: \.element.id) { index, workout in
-                                ModernWorkoutCardView(
-                                    workout: workout,
-                                    dataManager: dataManager,
-                                    onTap: {
-                                        selectedWorkout = workout
-                                    },
-                                    onStartWorkout: {
-                                        startWorkout(workout)
-                                    },
-                                    onShare: {
-                                        shareWorkout(workout)
-                                    },
-                                    onDuplicate: {
-                                        duplicateWorkout(workout)
-                                    },
-                                    onEdit: {
-                                        editWorkout(workout)
-                                    },
-                                    onDelete: {
-                                        deleteWorkout(workout)
-                                    }
-                                )
-                                .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
-                                .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
-                                .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
-                                .onDrag {
-                                    draggedWorkout = workout
-                                    return NSItemProvider(object: workout.id.uuidString as NSString)
-                                }
-                                .onDrop(of: [.text], delegate: WorkoutDropDelegate(
-                                    workout: workout,
-                                    dataManager: dataManager,
-                                    draggedWorkout: $draggedWorkout,
-                                    dragOffset: $dragOffset
-                                ))
+                            // Tab Interface
+                            TabInterface(selectedTab: $selectedTab)
+                            
+                            // Content based on selected tab
+                            if selectedTab == .adhoc {
+                                AdhocWorkoutsView(dataManager: dataManager, draggedWorkout: $draggedWorkout, dragOffset: $dragOffset, selectedWorkout: $selectedWorkout, showingWorkoutOverview: $showingWorkoutOverview)
+                            } else {
+                                RoutinesView(dataManager: dataManager)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -879,6 +862,433 @@ struct WorkoutDropDelegate: DropDelegate {
     
     func dropUpdated(info: DropInfo) -> DropProposal? {
         return DropProposal(operation: .move)
+    }
+}
+
+// MARK: - Tab Interface
+struct TabInterface: View {
+    @Binding var selectedTab: WorkoutTab
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(WorkoutTab.allCases, id: \.self) { tab in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                }) {
+                    VStack(spacing: 8) {
+                        Text(tab.displayName)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                        
+                        Rectangle()
+                            .fill(selectedTab == tab ? Color.blue : Color.clear)
+                            .frame(height: 2)
+                            .animation(.easeInOut(duration: 0.2), value: selectedTab)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+        )
+        .padding(.horizontal, 16)
+    }
+}
+
+// MARK: - Adhoc Workouts View
+struct AdhocWorkoutsView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @Binding var draggedWorkout: Workout?
+    @Binding var dragOffset: CGSize
+    @Binding var selectedWorkout: Workout?
+    @Binding var showingWorkoutOverview: Workout?
+    
+    var body: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(Array(dataManager.workouts.enumerated()), id: \.element.id) { index, workout in
+                ModernWorkoutCardView(
+                    workout: workout,
+                    dataManager: dataManager,
+                    onTap: {
+                        selectedWorkout = workout
+                    },
+                    onStartWorkout: {
+                        startWorkout(workout)
+                    },
+                    onShare: {
+                        shareWorkout(workout)
+                    },
+                    onDuplicate: {
+                        duplicateWorkout(workout)
+                    },
+                    onEdit: {
+                        editWorkout(workout)
+                    },
+                    onDelete: {
+                        deleteWorkout(workout)
+                    }
+                )
+                .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
+                .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
+                .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
+                .onDrag {
+                    draggedWorkout = workout
+                    return NSItemProvider(object: workout.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: WorkoutDropDelegate(
+                    workout: workout,
+                    dataManager: dataManager,
+                    draggedWorkout: $draggedWorkout,
+                    dragOffset: $dragOffset
+                ))
+            }
+        }
+    }
+    
+    private func startWorkout(_ workout: Workout) {
+        print("DEBUG: AdhocWorkoutsView - Starting workout: \(workout.name)")
+        print("DEBUG: AdhocWorkoutsView - Workout ID: \(workout.id)")
+        print("DEBUG: AdhocWorkoutsView - Exercise count: \(workout.exercises.count)")
+        
+        for (exIndex, exercise) in workout.exercises.enumerated() {
+            print("DEBUG: AdhocWorkoutsView - Exercise \(exIndex): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+            for (setIndex, set) in exercise.sets.enumerated() {
+                print("DEBUG: AdhocWorkoutsView -   Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+            }
+        }
+        
+        // Find the most recent modified workout with the same name
+        let recentModifiedWorkout = dataManager.workouts
+            .filter { $0.name == workout.name && $0.id != workout.id }
+            .filter { w in
+                w.exercises.contains { exercise in
+                    exercise.sets.contains { set in
+                        (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
+                    }
+                }
+            }
+            .sorted { $0.date > $1.date }
+            .first
+        
+        if let recentWorkout = recentModifiedWorkout {
+            print("DEBUG: AdhocWorkoutsView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
+            print("DEBUG: AdhocWorkoutsView - Recent workout sets:")
+            for exercise in recentWorkout.exercises {
+                print("DEBUG: AdhocWorkoutsView -   Exercise: \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                for (setIndex, set) in exercise.sets.enumerated() {
+                    print("DEBUG: AdhocWorkoutsView -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                }
+            }
+            // Create a new workout instance based on the recent workout's structure, but with fresh completion states
+            let newWorkout = Workout(
+                name: recentWorkout.name,
+                exercises: recentWorkout.exercises.map { exercise in
+                    WorkoutExercise(
+                        exercise: exercise.exercise,
+                        sets: exercise.sets.map { set in
+                            Set(
+                                reps: set.reps,
+                                weight: set.weight,
+                                duration: set.duration,
+                                distance: set.distance,
+                                restTime: set.restTime,
+                                isCompleted: false, // Reset completion state
+                                order: set.order
+                            )
+                        },
+                        order: exercise.order
+                    )
+                },
+                date: Date(),
+                duration: 0,
+                notes: recentWorkout.notes,
+                isTemplate: false
+            )
+            
+            print("DEBUG: AdhocWorkoutsView - Created new workout based on recent workout with ID: \(newWorkout.id)")
+            
+            // Start the workout session with the new workout
+            dataManager.startWorkout(newWorkout)
+            
+            // Navigate to active workout view
+            showingWorkoutOverview = newWorkout
+        } else {
+            // Create a copy of the workout for the active session
+            let activeWorkout = Workout(
+                name: workout.name,
+                exercises: workout.exercises,
+                date: Date(),
+                duration: 0,
+                notes: workout.notes,
+                isTemplate: false
+            )
+            
+            print("DEBUG: AdhocWorkoutsView - Created active workout with ID: \(activeWorkout.id)")
+            
+            // Start the workout session
+            dataManager.startWorkout(activeWorkout)
+            
+            // Navigate to active workout view
+            showingWorkoutOverview = activeWorkout
+        }
+    }
+    
+    private func shareWorkout(_ workout: Workout) {
+        // Implementation for sharing workout
+    }
+    
+    private func duplicateWorkout(_ workout: Workout) {
+        let duplicatedWorkout = Workout(
+            name: "\(workout.name) Copy",
+            exercises: workout.exercises.map { exercise in
+                WorkoutExercise(
+                    exercise: exercise.exercise,
+                    sets: exercise.sets.map { set in
+                        Set(
+                            reps: set.reps,
+                            weight: nil, // Reset weight for new workout
+                            duration: set.duration,
+                            distance: set.distance,
+                            restTime: set.restTime,
+                            isCompleted: false, // Reset completion status
+                            order: set.order
+                        )
+                    },
+                    notes: exercise.notes,
+                    order: exercise.order
+                )
+            },
+            date: Date(),
+            duration: nil,
+            notes: workout.notes,
+            isTemplate: false
+        )
+        
+        dataManager.addWorkout(duplicatedWorkout)
+    }
+    
+    private func editWorkout(_ workout: Workout) {
+        // Implementation for editing workout
+    }
+    
+    private func deleteWorkout(_ workout: Workout) {
+        dataManager.deleteWorkout(workout)
+        print("DEBUG: AdhocWorkoutsView - Deleted workout: \(workout.name)")
+    }
+}
+
+// MARK: - Routines View
+struct RoutinesView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @State private var showingNewRoutine = false
+    
+    var body: some View {
+        LazyVStack(spacing: 16) {
+            if dataManager.routines.isEmpty {
+                EmptyRoutinesView {
+                    showingNewRoutine = true
+                }
+            } else {
+                ForEach(dataManager.routines) { routine in
+                    RoutineCardView(routine: routine, dataManager: dataManager)
+                }
+            }
+        }
+        .sheet(isPresented: $showingNewRoutine) {
+            NewRoutineView(dataManager: dataManager)
+        }
+    }
+}
+
+// MARK: - Empty Routines View
+struct EmptyRoutinesView: View {
+    let onCreateRoutine: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 60))
+                .foregroundColor(.blue)
+            
+            VStack(spacing: 8) {
+                Text("No Routines Yet")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text("Create your first workout routine to get started with structured training")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            Button(action: onCreateRoutine) {
+                HStack {
+                    Image(systemName: "plus")
+                    Text("Create Routine")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(25)
+            }
+        }
+        .padding(40)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+// MARK: - Routine Card View
+struct RoutineCardView: View {
+    let routine: Routine
+    @EnvironmentObject var dataManager: DataManager
+    @State private var showingRoutineDetail = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(routine.name)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    
+                    Text("\(routine.days.count) days")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    showingRoutineDetail = true
+                }) {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Days preview
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                ForEach(routine.days) { day in
+                    DayPreviewView(day: day)
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        )
+        .sheet(isPresented: $showingRoutineDetail) {
+            RoutineDetailView(routine: routine, dataManager: dataManager)
+        }
+    }
+}
+
+// MARK: - Day Preview View
+struct DayPreviewView: View {
+    let day: RoutineDay
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(day.dayName)
+                .font(.caption)
+                .fontWeight(.medium)
+            
+            if day.isRestDay {
+                Text("Rest")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else if let workout = day.workout {
+                Text(workout.name)
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+                    .lineLimit(1)
+            } else {
+                Text("Empty")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.systemGray6))
+        )
+    }
+}
+
+// MARK: - New Routine View (Placeholder)
+struct NewRoutineView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                Text("Create New Routine")
+                    .font(.title)
+                    .padding()
+                
+                Text("Routine creation functionality will be implemented here")
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+            }
+            .navigationTitle("New Routine")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Routine Detail View (Placeholder)
+struct RoutineDetailView: View {
+    let routine: Routine
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                Text("Routine Details")
+                    .font(.title)
+                    .padding()
+                
+                Text("Routine detail functionality will be implemented here")
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+            }
+            .navigationTitle(routine.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

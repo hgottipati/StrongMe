@@ -11,6 +11,7 @@ import Combine
 
 class DataManager: ObservableObject {
     @Published var workouts: [Workout] = []
+    @Published var routines: [Routine] = []
     @Published var exerciseLibrary: [Exercise] = []
     @Published var currentUser: User?
     @Published var currentWorkout: Workout?
@@ -114,6 +115,7 @@ class DataManager: ObservableObject {
     private func loadData() {
         loadSampleExercises()
         loadWorkouts()
+        loadRoutines()
         loadUser()
     }
     
@@ -278,5 +280,31 @@ class DataManager: ObservableObject {
             workoutPreferences: WorkoutPreferences()
         )
         persistenceManager.saveUser(currentUser!)
+    }
+    
+    // MARK: - Routine Management
+    func addRoutine(_ routine: Routine) {
+        routines.append(routine)
+        saveRoutines()
+    }
+    
+    func updateRoutine(_ routine: Routine) {
+        if let index = routines.firstIndex(where: { $0.id == routine.id }) {
+            routines[index] = routine
+            saveRoutines()
+        }
+    }
+    
+    func deleteRoutine(_ routine: Routine) {
+        routines.removeAll { $0.id == routine.id }
+        saveRoutines()
+    }
+    
+    func saveRoutines() {
+        persistenceManager.saveRoutines(routines)
+    }
+    
+    func loadRoutines() {
+        routines = persistenceManager.loadRoutines()
     }
 }
