@@ -210,7 +210,7 @@ struct WorkoutsView: View {
                     ScrollView {
                         LazyVStack(spacing: 20) {
                             // Weekly Overview Section
-                            WeeklyOverviewSection(dataManager: dataManager)
+                            WeeklyOverviewSection()
                             
                             // Tab Interface
                             TabInterface(selectedTab: $selectedTab)
@@ -246,7 +246,7 @@ struct WorkoutsView: View {
                     .environmentObject(dataManager)
             }
             .sheet(item: $showingWorkoutOverview) { workout in
-                WorkoutSheetView(workout: workout, dataManager: dataManager)
+                WorkoutSheetView(workout: workout)
             }
             .sheet(isPresented: $showingShareSheet) {
                 if let workout = workoutToShare {
@@ -431,7 +431,7 @@ struct WorkoutCardView: View {
 
 struct WorkoutSheetView: View {
     let workout: Workout
-    let dataManager: DataManager
+    @EnvironmentObject var dataManager: DataManager
     
     // Check if this workout has been modified (has actual set data)
     private var hasBeenModified: Bool {
@@ -529,7 +529,7 @@ struct WorkoutSheetView: View {
 
 // MARK: - Weekly Overview Section
 struct WeeklyOverviewSection: View {
-    let dataManager: DataManager
+    @EnvironmentObject var dataManager: DataManager
     
     private var currentWeekWorkouts: [Workout] {
         let calendar = Calendar.current

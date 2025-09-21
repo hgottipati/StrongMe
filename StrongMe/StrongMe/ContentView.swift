@@ -15,6 +15,7 @@ struct ContentView: View {
         TabView(selection: $selectedTab) {
             // Workouts Tab
             WorkoutsView()
+                .environmentObject(dataManager)
                 .tabItem {
                     Image(systemName: "dumbbell.fill")
                     Text("Workouts")
@@ -23,6 +24,7 @@ struct ContentView: View {
             
             // Exercises Tab
             ExercisesView()
+                .environmentObject(dataManager)
                 .tabItem {
                     Image(systemName: "list.bullet")
                     Text("Exercises")
@@ -31,6 +33,7 @@ struct ContentView: View {
             
                 // Progress Tab
                 ProgressStatsView()
+                    .environmentObject(dataManager)
                     .tabItem {
                         Image(systemName: "chart.line.uptrend.xyaxis")
                         Text("Progress")
@@ -39,6 +42,7 @@ struct ContentView: View {
             
             // Profile Tab
             ProfileView()
+                .environmentObject(dataManager)
                 .tabItem {
                     Image(systemName: "person.circle")
                     Text("Profile")
