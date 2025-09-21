@@ -866,8 +866,8 @@ struct AdhocWorkoutsView: View {
     @Binding var dragOffset: CGSize
     @Binding var selectedWorkout: Workout?
     @Binding var showingWorkoutOverview: Workout?
-    @State private var lastReorderIndex: Int? = nil
     @State private var hasDragged: Bool = false
+    @State private var lastReorderTime: Date = Date()
     
     var body: some View {
         LazyVStack(spacing: 16) {
@@ -929,7 +929,6 @@ struct AdhocWorkoutsView: View {
                             // Reset drag state
                             draggedWorkout = nil
                             dragOffset = .zero
-                            lastReorderIndex = nil
                             hasDragged = false
                             
                             // Provide success feedback
@@ -975,8 +974,9 @@ struct AdhocWorkoutsView: View {
                 return // No reorder needed
             }
             
-            // Only reorder if the new position is different and valid, and we haven't already reordered to this position
-            if newIndex != draggedIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && lastReorderIndex != newIndex {
+            // Only reorder if the new position is different and valid, and enough time has passed since last reorder
+            let timeSinceLastReorder = Date().timeIntervalSince(lastReorderTime)
+            if newIndex != draggedIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && timeSinceLastReorder > 0.2 {
                 print("DEBUG: Performing reorder from \(draggedIndex) to \(newIndex)")
                 
                 // Perform the reorder with animation
@@ -988,10 +988,10 @@ struct AdhocWorkoutsView: View {
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                 impactFeedback.impactOccurred()
                 
-                // Track this reorder to prevent multiple reorders to the same position
-                lastReorderIndex = newIndex
+                // Update last reorder time to prevent rapid reorders
+                lastReorderTime = Date()
             } else {
-                print("DEBUG: Reorder skipped - newIndex: \(newIndex), draggedIndex: \(draggedIndex), lastReorderIndex: \(lastReorderIndex ?? -1)")
+                print("DEBUG: Reorder skipped - newIndex: \(newIndex), draggedIndex: \(draggedIndex), timeSinceLastReorder: \(timeSinceLastReorder)")
             }
         }
     }
