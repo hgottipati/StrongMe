@@ -220,8 +220,8 @@ struct WorkoutsView: View {
                                         deleteWorkout(workout)
                                     }
                                 )
-                                .onMove(perform: moveWorkouts)
                             }
+                            .onMove(perform: moveWorkouts)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
