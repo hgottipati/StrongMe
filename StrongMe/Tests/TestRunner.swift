@@ -6,6 +6,7 @@
 //
 
 import Foundation
+@testable import StrongMe
 
 /// Simple test runner for manual verification
 /// This can be used to run basic tests without Xcode

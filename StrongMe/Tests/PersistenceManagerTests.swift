@@ -7,6 +7,7 @@
 
 import XCTest
 @testable import StrongMe
+@testable import StrongMe
 
 class PersistenceManagerTests: XCTestCase {
     var persistenceManager: PersistenceManager!
