@@ -9,6 +9,10 @@ struct WorkoutsView: View {
     @State private var showingShareSheet = false
     @State private var workoutToShare: Workout?
     
+    // Drag and drop state
+    @State private var draggedWorkout: Workout? = nil
+    @State private var dragOffset: CGSize = .zero
+    
     // MARK: - Action Functions
     private func shareWorkout(_ workout: Workout) {
         workoutToShare = workout
@@ -220,8 +224,20 @@ struct WorkoutsView: View {
                                         deleteWorkout(workout)
                                     }
                                 )
+                                .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
+                                .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
+                                .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
+                                .onDrag {
+                                    draggedWorkout = workout
+                                    return NSItemProvider(object: workout.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: WorkoutDropDelegate(
+                                    workout: workout,
+                                    dataManager: dataManager,
+                                    draggedWorkout: $draggedWorkout,
+                                    dragOffset: $dragOffset
+                                ))
                             }
-                            .onMove(perform: moveWorkouts)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
@@ -819,6 +835,50 @@ struct ModernWorkoutCardView: View {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Workout Drop Delegate
+struct WorkoutDropDelegate: DropDelegate {
+    let workout: Workout
+    let dataManager: DataManager
+    @Binding var draggedWorkout: Workout?
+    @Binding var dragOffset: CGSize
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggedWorkout = draggedWorkout,
+              draggedWorkout.id != workout.id else { return }
+        
+        // Provide haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // Move the dragged workout to the position of the drop target
+        withAnimation(.easeInOut(duration: 0.3)) {
+            if let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }),
+               let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) {
+                dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: targetIndex)
+            }
+        }
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        // Reset drag state
+        draggedWorkout = nil
+        dragOffset = .zero
+        
+        // Provide success haptic feedback
+        let successFeedback = UINotificationFeedbackGenerator()
+        successFeedback.notificationOccurred(.success)
+        
+        // Save the changes
+        dataManager.saveWorkoutsDirectly(dataManager.workouts)
+        
+        return true
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
     }
 }
 
