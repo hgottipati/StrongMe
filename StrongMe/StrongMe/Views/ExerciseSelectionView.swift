@@ -1,10 +1,11 @@
 import SwiftUI
+import Foundation
 
 struct ExerciseSelectionView: View {
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedExercises: Swift.Set<Exercise> = []
+    @State private var selectedExercises: Foundation.Set<Exercise> = []
     @State private var searchText = ""
     @State private var selectedCategory: ExerciseCategory? = nil
     
