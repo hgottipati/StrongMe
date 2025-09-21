@@ -47,12 +47,25 @@ class DataManager: ObservableObject {
             }
         }
         
+        // First try to find by exact ID match
         if let index = workouts.firstIndex(where: { $0.id == workout.id }) {
-            print("DEBUG: DataManager.saveWorkout - Updating existing workout at index \(index)")
+            print("DEBUG: DataManager.saveWorkout - Updating existing workout by ID at index \(index)")
             workouts[index] = workout
         } else {
-            print("DEBUG: DataManager.saveWorkout - Adding new workout")
-            workouts.append(workout)
+            // If no ID match, check if this is an update to an existing workout
+            // Look for workouts with the same name and recent date (within last 24 hours)
+            let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+            if let index = workouts.firstIndex(where: { existingWorkout in
+                existingWorkout.name == workout.name && 
+                existingWorkout.date > oneDayAgo &&
+                !existingWorkout.name.contains("Copy") // Don't update if it's a copy
+            }) {
+                print("DEBUG: DataManager.saveWorkout - Updating existing workout by name/date at index \(index)")
+                workouts[index] = workout
+            } else {
+                print("DEBUG: DataManager.saveWorkout - Adding new workout")
+                workouts.append(workout)
+            }
         }
         
         print("DEBUG: DataManager.saveWorkout - Total workouts after save: \(workouts.count)")
@@ -74,6 +87,11 @@ class DataManager: ObservableObject {
     
     func deleteWorkout(_ workout: Workout) {
         workouts.removeAll { $0.id == workout.id }
+        persistenceManager.saveWorkouts(workouts)
+    }
+    
+    func saveWorkoutsDirectly(_ workouts: [Workout]) {
+        self.workouts = workouts
         persistenceManager.saveWorkouts(workouts)
     }
     

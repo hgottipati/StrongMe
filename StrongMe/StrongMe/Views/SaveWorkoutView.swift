@@ -312,12 +312,36 @@ struct SaveWorkoutView: View {
     }
     
     private func finalizeWorkout() {
-        // Save the workout with updated name and description
-        var updatedWorkout = workout
-        updatedWorkout.name = workoutName
+        // Create a new workout that preserves the original workout's ID but has the updated content
+        var updatedWorkout = Workout(
+            name: workoutName,
+            exercises: workout.exercises,
+            date: workout.date,
+            duration: workout.duration,
+            notes: workout.notes,
+            isTemplate: workout.isTemplate
+        )
         
-        // Use DataManager's saveWorkout method to properly update the state
-        dataManager.saveWorkout(updatedWorkout)
+        // Manually set the ID to match the original workout to ensure it updates instead of creating new
+        // We need to create a workout that will be recognized as an update
+        // Since we can't modify the ID after creation, we'll use a different approach
+        
+        // Instead, let's find the original workout in the dataManager and update it directly
+        if let index = dataManager.workouts.firstIndex(where: { $0.id == originalWorkout.id }) {
+            print("DEBUG: SaveWorkoutView.finalizeWorkout - Updating original workout at index \(index)")
+            dataManager.workouts[index].name = workoutName
+            dataManager.workouts[index].exercises = workout.exercises
+            dataManager.workouts[index].duration = workout.duration
+            dataManager.workouts[index].notes = workout.notes
+            dataManager.workouts[index].isTemplate = workout.isTemplate
+            
+            // Save the updated workouts using the public method
+            dataManager.saveWorkoutsDirectly(dataManager.workouts)
+        } else {
+            print("DEBUG: SaveWorkoutView.finalizeWorkout - Original workout not found, using saveWorkout method")
+            // Fallback to the original method if we can't find the original workout
+            dataManager.saveWorkout(workout)
+        }
         
         // Navigate to celebration screen
         showingCelebration = true

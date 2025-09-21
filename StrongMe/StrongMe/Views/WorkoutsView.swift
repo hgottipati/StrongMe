@@ -5,6 +5,84 @@ struct WorkoutsView: View {
     @State private var showingNewWorkout = false
     @State private var selectedWorkout: Workout? = nil
     @State private var showingWorkoutOverview: Workout? = nil
+    @State private var showingShareSheet = false
+    @State private var workoutToShare: Workout?
+    
+    // MARK: - Action Functions
+    private func shareWorkout(_ workout: Workout) {
+        workoutToShare = workout
+        showingShareSheet = true
+    }
+    
+    private func duplicateWorkout(_ workout: Workout) {
+        let duplicatedWorkout = Workout(
+            name: "\(workout.name) Copy",
+            exercises: workout.exercises.map { exercise in
+                WorkoutExercise(
+                    exercise: exercise.exercise,
+                    sets: exercise.sets.map { set in
+                        Set(
+                            reps: set.reps,
+                            weight: nil, // Reset weight for new workout
+                            duration: set.duration,
+                            distance: set.distance,
+                            restTime: set.restTime,
+                            isCompleted: false, // Reset completion status
+                            order: set.order
+                        )
+                    },
+                    notes: exercise.notes,
+                    order: exercise.order
+                )
+            },
+            date: Date(),
+            duration: nil,
+            notes: workout.notes,
+            isTemplate: workout.isTemplate
+        )
+        
+        dataManager.workouts.append(duplicatedWorkout)
+        print("DEBUG: WorkoutsView - Duplicated workout: \(workout.name) -> \(duplicatedWorkout.name)")
+    }
+    
+    private func editWorkout(_ workout: Workout) {
+        selectedWorkout = workout
+    }
+    
+    private func deleteWorkout(_ workout: Workout) {
+        dataManager.deleteWorkout(workout)
+        print("DEBUG: WorkoutsView - Deleted workout: \(workout.name)")
+    }
+    
+    private func moveWorkouts(from source: IndexSet, to destination: Int) {
+        print("DEBUG: WorkoutsView - Moving workouts from \(source) to \(destination)")
+        dataManager.workouts.move(fromOffsets: source, toOffset: destination)
+        dataManager.saveWorkoutsDirectly(dataManager.workouts)
+        print("DEBUG: WorkoutsView - Workouts reordered successfully")
+    }
+    
+    private func workoutShareText(_ workout: Workout) -> String {
+        var text = "🏋️ Workout: \(workout.name)\n\n"
+        
+        for exercise in workout.exercises {
+            text += "• \(exercise.exercise.name)\n"
+            for set in exercise.sets {
+                if let weight = set.weight, let reps = set.reps {
+                    text += "  - \(Int(weight))lbs × \(reps) reps\n"
+                } else if let reps = set.reps {
+                    text += "  - \(reps) reps\n"
+                }
+            }
+            text += "\n"
+        }
+        
+        if let notes = workout.notes, !notes.isEmpty {
+            text += "Notes: \(notes)\n"
+        }
+        
+        text += "\nCreated with StrongMe 💪"
+        return text
+    }
     
     var body: some View {
         NavigationView {
@@ -14,11 +92,11 @@ struct WorkoutsView: View {
                         showingNewWorkout = true
                     }
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
+                    List {
                         ForEach(dataManager.workouts) { workout in
                             WorkoutCardView(
                                 workout: workout,
+                                dataManager: dataManager,
                                 onTap: {
                                     selectedWorkout = workout
                                 },
@@ -97,11 +175,23 @@ struct WorkoutsView: View {
                                         print("DEBUG: WorkoutsView - No recent modified workout found, using template")
                                         showingWorkoutOverview = workout
                                     }
+                                },
+                                onShare: {
+                                    shareWorkout(workout)
+                                },
+                                onDuplicate: {
+                                    duplicateWorkout(workout)
+                                },
+                                onEdit: {
+                                    editWorkout(workout)
+                                },
+                                onDelete: {
+                                    deleteWorkout(workout)
                                 }
                             )
                         }
-                        }
-                        .padding()
+                        .onMove(perform: moveWorkouts)
+                        .listStyle(PlainListStyle())
                     }
                 }
             }
@@ -125,6 +215,11 @@ struct WorkoutsView: View {
             }
             .sheet(item: $showingWorkoutOverview) { workout in
                 WorkoutSheetView(workout: workout, dataManager: dataManager)
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let workout = workoutToShare {
+                    ShareSheet(activityItems: [workoutShareText(workout)])
+                }
             }
         }
     }
@@ -168,8 +263,13 @@ struct EmptyWorkoutsView: View {
 
 struct WorkoutCardView: View {
     let workout: Workout
+    let dataManager: DataManager
     let onTap: () -> Void
     let onStartWorkout: () -> Void
+    let onShare: () -> Void
+    let onDuplicate: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
     
     private var exerciseCount: Int {
         workout.exercises.count
@@ -205,14 +305,43 @@ struct WorkoutCardView: View {
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("\(exerciseCount) exercises")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("\(exerciseCount) exercises")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(completedSets)/\(totalSets) sets")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         
-                        Text("\(completedSets)/\(totalSets) sets")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // 3-dot menu
+                        Menu {
+                            Button(action: onShare) {
+                                Label("Share Workout", systemImage: "square.and.arrow.up")
+                            }
+                            
+                            Button(action: onDuplicate) {
+                                Label("Duplicate Workout", systemImage: "doc.on.doc")
+                            }
+                            
+                            Button(action: onEdit) {
+                                Label("Edit Workout", systemImage: "pencil")
+                            }
+                            
+                            Divider()
+                            
+                            Button(action: onDelete) {
+                                Label("Delete Workout", systemImage: "trash")
+                            }
+                            .foregroundColor(.red)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                                .padding(8)
+                        }
                     }
                 }
                 
@@ -252,9 +381,10 @@ struct WorkoutCardView: View {
                     }
                 }
             }
-            .padding()
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
             .background(Color(.systemBackground))
-            .cornerRadius(16)
+            .cornerRadius(12)
             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         }
         .buttonStyle(PlainButtonStyle())
