@@ -57,7 +57,17 @@ struct WorkoutsView: View {
     
     private func moveWorkouts(from source: IndexSet, to destination: Int) {
         print("DEBUG: WorkoutsView - Moving workouts from \(source) to \(destination)")
-        dataManager.workouts.move(fromOffsets: source, toOffset: destination)
+        
+        // Provide haptic feedback for successful reordering
+        let successFeedback = UINotificationFeedbackGenerator()
+        successFeedback.notificationOccurred(.success)
+        
+        // Perform the move with smooth animation
+        withAnimation(.easeInOut(duration: 0.3)) {
+            dataManager.workouts.move(fromOffsets: source, toOffset: destination)
+        }
+        
+        // Save the changes
         dataManager.saveWorkoutsDirectly(dataManager.workouts)
         print("DEBUG: WorkoutsView - Workouts reordered successfully")
     }
@@ -195,17 +205,7 @@ struct WorkoutsView: View {
                                         deleteWorkout(workout)
                                     }
                                 )
-                                .onDrag {
-                                    // Provide haptic feedback when drag starts
-                                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                    impactFeedback.impactOccurred()
-                                    return NSItemProvider(object: workout.id.uuidString as NSString)
-                                }
-                                .onDrop(of: [.text], delegate: ImprovedWorkoutDropDelegate(
-                                    workout: workout,
-                                    dataManager: dataManager,
-                                    moveWorkouts: moveWorkouts
-                                ))
+                                .onMove(perform: moveWorkouts)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -628,15 +628,21 @@ struct ModernWorkoutCardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Header with title, date, and menu
                 HStack {
-                    // Drag handle indicator
-                    VStack(spacing: 2) {
+                    // Enhanced drag handle indicator
+                    VStack(spacing: 3) {
                         ForEach(0..<3) { _ in
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(Color.secondary.opacity(0.4))
-                                .frame(width: 3, height: 3)
+                            HStack(spacing: 2) {
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(Color.secondary.opacity(0.6))
+                                    .frame(width: 3, height: 3)
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(Color.secondary.opacity(0.6))
+                                    .frame(width: 3, height: 3)
+                            }
                         }
                     }
-                    .padding(.trailing, 8)
+                    .padding(.trailing, 12)
+                    .padding(.vertical, 4)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(workout.name)
@@ -801,70 +807,6 @@ struct ModernWorkoutCardView: View {
     }
 }
 
-// MARK: - Improved Workout Drop Delegate
-struct ImprovedWorkoutDropDelegate: DropDelegate {
-    let workout: Workout
-    let dataManager: DataManager
-    let moveWorkouts: (IndexSet, Int) -> Void
-    
-    @State private var isDragOver = false
-    
-    func dropEntered(info: DropInfo) {
-        // Provide haptic feedback when entering drop zone
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
-        
-        // Add visual feedback - this could be enhanced with animation
-        withAnimation(.easeInOut(duration: 0.2)) {
-            // Visual feedback could be added here
-        }
-    }
-    
-    func dropExited(info: DropInfo) {
-        // Remove visual feedback when exiting drop zone
-        withAnimation(.easeInOut(duration: 0.2)) {
-            // Remove visual feedback
-        }
-    }
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        // Allow dropping and provide visual feedback
-        return DropProposal(operation: .move)
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        guard let item = info.itemProviders(for: [.text]).first else { return false }
-        
-        item.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
-            if let data = data as? Data,
-               let workoutIdString = String(data: data, encoding: .utf8),
-               let draggedWorkoutId = UUID(uuidString: workoutIdString) {
-                
-                DispatchQueue.main.async {
-                    // Find the indices
-                    guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkoutId }),
-                          let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) else { return }
-                    
-                    // Only move if it's actually a different position
-                    if draggedIndex != targetIndex {
-                        // Provide success haptic feedback
-                        let successFeedback = UINotificationFeedbackGenerator()
-                        successFeedback.notificationOccurred(.success)
-                        
-                        let indexSet = IndexSet(integer: draggedIndex)
-                        moveWorkouts(indexSet, targetIndex)
-                    } else {
-                        // Provide warning haptic feedback for invalid drop
-                        let warningFeedback = UINotificationFeedbackGenerator()
-                        warningFeedback.notificationOccurred(.warning)
-                    }
-                }
-            }
-        }
-        
-        return true
-    }
-}
 
 #Preview {
     WorkoutsView()
