@@ -867,7 +867,8 @@ struct AdhocWorkoutsView: View {
     @Binding var selectedWorkout: Workout?
     @Binding var showingWorkoutOverview: Workout?
     @State private var hasDragged: Bool = false
-    @State private var lastReorderTime: Date = Date()
+    @State private var lastReorderIndex: Int? = nil
+    @State private var initialDragOffset: CGFloat = 0
     
     var body: some View {
         LazyVStack(spacing: 16) {
@@ -909,6 +910,8 @@ struct AdhocWorkoutsView: View {
                             if !hasDragged {
                                 hasDragged = true
                                 draggedWorkout = workout
+                                initialDragOffset = value.translation.height
+                                lastReorderIndex = nil
                                 print("DEBUG: Drag started for workout: \(workout.name)")
                                 
                                 // Provide haptic feedback when drag starts
@@ -921,7 +924,7 @@ struct AdhocWorkoutsView: View {
                             dragOffset = constrainedOffset
                             
                             // Check if we should reorder based on vertical position
-                            checkForReorder(dragOffset: constrainedOffset)
+                            checkForReorder(dragOffset: constrainedOffset, currentIndex: index)
                         }
                         .onEnded { value in
                             print("DEBUG: DragGesture onEnded - final translation: \(value.translation)")
@@ -930,6 +933,8 @@ struct AdhocWorkoutsView: View {
                             draggedWorkout = nil
                             dragOffset = .zero
                             hasDragged = false
+                            lastReorderIndex = nil
+                            initialDragOffset = 0
                             
                             // Provide success feedback
                             let successFeedback = UINotificationFeedbackGenerator()
@@ -943,55 +948,48 @@ struct AdhocWorkoutsView: View {
         }
     }
     
-    private func checkForReorder(dragOffset: CGSize) {
+    private func checkForReorder(dragOffset: CGSize, currentIndex: Int) {
         guard let draggedWorkout = draggedWorkout else { return }
         
         // Calculate the threshold for reordering (smaller threshold for better responsiveness)
         let reorderThreshold: CGFloat = 50
         
         // Debug logging
-        print("DEBUG: checkForReorder - dragOffset.height: \(dragOffset.height), threshold: \(reorderThreshold)")
+        print("DEBUG: checkForReorder - dragOffset.height: \(dragOffset.height), threshold: \(reorderThreshold), currentIndex: \(currentIndex)")
         
         // Check if the dragged card has moved enough to trigger a reorder
         if abs(dragOffset.height) > reorderThreshold {
-            // Find current position of dragged workout
-            guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }) else { 
-                print("DEBUG: Could not find dragged workout index")
-                return 
-            }
-            
             // Calculate new position based on drag direction
             let newIndex: Int
             if dragOffset.height < -reorderThreshold {
                 // Moving up - move to previous position
-                newIndex = max(0, draggedIndex - 1)
-                print("DEBUG: Moving UP - draggedIndex: \(draggedIndex), newIndex: \(newIndex)")
+                newIndex = max(0, currentIndex - 1)
+                print("DEBUG: Moving UP - currentIndex: \(currentIndex), newIndex: \(newIndex)")
             } else if dragOffset.height > reorderThreshold {
                 // Moving down - move to next position
-                newIndex = min(dataManager.workouts.count - 1, draggedIndex + 1)
-                print("DEBUG: Moving DOWN - draggedIndex: \(draggedIndex), newIndex: \(newIndex)")
+                newIndex = min(dataManager.workouts.count - 1, currentIndex + 1)
+                print("DEBUG: Moving DOWN - currentIndex: \(currentIndex), newIndex: \(newIndex)")
             } else {
                 return // No reorder needed
             }
             
-            // Only reorder if the new position is different and valid, and enough time has passed since last reorder
-            let timeSinceLastReorder = Date().timeIntervalSince(lastReorderTime)
-            if newIndex != draggedIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && timeSinceLastReorder > 0.2 {
-                print("DEBUG: Performing reorder from \(draggedIndex) to \(newIndex)")
+            // Only reorder if the new position is different and valid, and we haven't already reordered to this position
+            if newIndex != currentIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && lastReorderIndex != newIndex {
+                print("DEBUG: Performing reorder from \(currentIndex) to \(newIndex)")
                 
                 // Perform the reorder with animation
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: newIndex)
+                    dataManager.workouts.move(fromOffsets: IndexSet(integer: currentIndex), toOffset: newIndex)
                 }
                 
                 // Provide haptic feedback for reorder
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                 impactFeedback.impactOccurred()
                 
-                // Update last reorder time to prevent rapid reorders
-                lastReorderTime = Date()
+                // Update last reorder index to prevent duplicate reorders
+                lastReorderIndex = newIndex
             } else {
-                print("DEBUG: Reorder skipped - newIndex: \(newIndex), draggedIndex: \(draggedIndex), timeSinceLastReorder: \(timeSinceLastReorder)")
+                print("DEBUG: Reorder skipped - newIndex: \(newIndex), currentIndex: \(currentIndex), lastReorderIndex: \(lastReorderIndex ?? -1)")
             }
         }
     }
