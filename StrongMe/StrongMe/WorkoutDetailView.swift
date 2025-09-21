@@ -104,10 +104,110 @@ struct WorkoutDetailView: View {
                 EditWorkoutView(workout: currentWorkout)
             }
             .sheet(isPresented: $showingStartWorkout) {
-                ActiveWorkoutView(workout: currentWorkout, onWorkoutComplete: {
-                    // Dismiss the ActiveWorkoutView when workout is complete
-                    showingStartWorkout = false
-                })
+                // Find the most recent modified workout with the same name (same logic as WorkoutsView)
+                let recentModifiedWorkout = dataManager.workouts
+                    .filter { $0.name == currentWorkout.name && $0.id != currentWorkout.id }
+                    .filter { w in
+                        w.exercises.contains { exercise in
+                            exercise.sets.contains { set in
+                                (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
+                            }
+                        }
+                    }
+                    .sorted { $0.date > $1.date }
+                    .first
+                
+                if let recentWorkout = recentModifiedWorkout {
+                    // Create a new workout instance based on the recent workout's structure, but with fresh completion states
+                    let newWorkout = Workout(
+                        name: recentWorkout.name,
+                        exercises: recentWorkout.exercises.map { exercise in
+                            WorkoutExercise(
+                                exercise: exercise.exercise,
+                                sets: exercise.sets.map { set in
+                                    Set(
+                                        reps: set.reps ?? 10, // Keep the reps from previous session
+                                        weight: set.weight, // Keep the weight from previous session
+                                        duration: set.duration,
+                                        distance: set.distance,
+                                        restTime: set.restTime,
+                                        isCompleted: false, // Start as not completed for new session
+                                        order: set.order
+                                    )
+                                },
+                                notes: exercise.notes,
+                                order: exercise.order
+                            )
+                        },
+                        date: Date(), // New date for new session
+                        duration: nil,
+                        notes: recentWorkout.notes,
+                        isTemplate: false
+                    )
+                    
+                    ActiveWorkoutView(workout: newWorkout, onWorkoutComplete: {
+                        // Dismiss the ActiveWorkoutView when workout is complete
+                        showingStartWorkout = false
+                    })
+                    .environmentObject(dataManager)
+                    .onAppear {
+                        print("DEBUG: WorkoutDetailView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
+                        print("DEBUG: WorkoutDetailView - Created new workout from recent modified workout: \(newWorkout.name)")
+                        print("DEBUG: WorkoutDetailView - New workout ID: \(newWorkout.id)")
+                        print("DEBUG: WorkoutDetailView - New workout sets:")
+                        for exercise in newWorkout.exercises {
+                            print("DEBUG: WorkoutDetailView -   Exercise: \(exercise.exercise.name)")
+                            for (index, set) in exercise.sets.enumerated() {
+                                print("DEBUG: WorkoutDetailView -     Set \(index): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                            }
+                        }
+                    }
+                } else {
+                    // Create a new workout instance based on the template
+                    let newWorkout = Workout(
+                        name: currentWorkout.name,
+                        exercises: currentWorkout.exercises.map { exercise in
+                            WorkoutExercise(
+                                exercise: exercise.exercise,
+                                sets: exercise.sets.map { set in
+                                    Set(
+                                        reps: 10, // Default reps for new session
+                                        weight: nil, // Start with no weight for new session
+                                        duration: set.duration,
+                                        distance: set.distance,
+                                        restTime: set.restTime,
+                                        isCompleted: false, // Start as not completed
+                                        order: set.order
+                                    )
+                                },
+                                notes: exercise.notes,
+                                order: exercise.order
+                            )
+                        },
+                        date: Date(), // New date for new session
+                        duration: nil,
+                        notes: currentWorkout.notes,
+                        isTemplate: false
+                    )
+                    
+                    ActiveWorkoutView(workout: newWorkout, onWorkoutComplete: {
+                        // Dismiss the ActiveWorkoutView when workout is complete
+                        showingStartWorkout = false
+                    })
+                    .environmentObject(dataManager)
+                    .onAppear {
+                        print("DEBUG: WorkoutDetailView - No recent modified workout found, creating new workout from template: \(currentWorkout.name)")
+                        print("DEBUG: WorkoutDetailView - Original workout ID: \(currentWorkout.id)")
+                        print("DEBUG: WorkoutDetailView - New workout ID: \(newWorkout.id)")
+                        print("DEBUG: WorkoutDetailView - New workout sets:")
+                        for exercise in newWorkout.exercises {
+                            print("DEBUG: WorkoutDetailView -   Exercise: \(exercise.exercise.name)")
+                            for (index, set) in exercise.sets.enumerated() {
+                                print("DEBUG: WorkoutDetailView -     Set \(index): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

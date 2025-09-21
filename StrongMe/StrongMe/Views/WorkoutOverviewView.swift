@@ -491,9 +491,8 @@ struct SetOverviewRow: View {
     }
     
     private var previousPerformance: String {
-        if let reps = set.reps, let weight = set.weight {
-            return "\(Int(weight))lbs × \(reps)"
-        }
+        // This should show historical data, not current set data
+        // For now, return "-" since this view should be replaced with ActiveWorkoutView
         return "-"
     }
 }

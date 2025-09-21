@@ -13,7 +13,18 @@ struct ActiveWorkoutView: View {
     
     let workout: Workout
     let onWorkoutComplete: (() -> Void)?
-    @State private var currentWorkout: Workout
+    @State private var currentWorkout: Workout {
+        didSet {
+            print("DEBUG: ActiveWorkoutView - currentWorkout state changed to: \(currentWorkout.id)")
+            print("DEBUG: ActiveWorkoutView - currentWorkout exercises: \(currentWorkout.exercises.count)")
+            for (index, exercise) in currentWorkout.exercises.enumerated() {
+                print("DEBUG: ActiveWorkoutView - Exercise \(index): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                for (setIndex, set) in exercise.sets.enumerated() {
+                    print("DEBUG: ActiveWorkoutView - Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0)")
+                }
+            }
+        }
+    }
     @State private var currentExerciseIndex = 0
     @State private var currentSetIndex = 0
     @State private var restTimer: Timer?
@@ -29,6 +40,16 @@ struct ActiveWorkoutView: View {
         self.workout = workout
         self.onWorkoutComplete = onWorkoutComplete
         self._currentWorkout = State(initialValue: workout)
+        
+        print("DEBUG: ActiveWorkoutView.init - Received workout: \(workout.name)")
+        print("DEBUG: ActiveWorkoutView.init - Workout ID: \(workout.id)")
+        print("DEBUG: ActiveWorkoutView.init - Workout sets:")
+        for exercise in workout.exercises {
+            print("DEBUG: ActiveWorkoutView.init -   Exercise: \(exercise.exercise.name)")
+            for (index, set) in exercise.sets.enumerated() {
+                print("DEBUG: ActiveWorkoutView.init -     Set \(index): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+            }
+        }
     }
     
     var currentExercise: WorkoutExercise? {
@@ -63,8 +84,11 @@ struct ActiveWorkoutView: View {
                             ForEach(Array(currentWorkout.exercises.enumerated()), id: \.element.id) { index, exercise in
                                 ExerciseCard(
                                     exercise: exercise,
+                                    currentWorkout: currentWorkout,
                                     exerciseNumber: index + 1,
                                     totalExercises: currentWorkout.exercises.count,
+                                    dataManager: dataManager,
+                                    currentWorkoutId: currentWorkout.id,
                                     onAddSet: {
                                         addSetToExercise(exercise)
                                     },
@@ -73,6 +97,9 @@ struct ActiveWorkoutView: View {
                                     },
                                     onCompleteSet: { setIndex in
                                         completeSet(exercise, setIndex: setIndex)
+                                    },
+                                    onDeleteSet: { exercise, setIndex in
+                                        deleteSet(exercise, setIndex: setIndex)
                                     },
                                     onTap: {
                                         selectExercise(index)
@@ -136,7 +163,8 @@ struct ActiveWorkoutView: View {
                             }
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
             }
             .navigationTitle(currentWorkout.name)
@@ -195,6 +223,30 @@ struct ActiveWorkoutView: View {
                     onWorkoutComplete?()
                 })
                 .environmentObject(dataManager)
+                .onAppear {
+                    print("DEBUG: ActiveWorkoutView - Opening SaveWorkoutView with currentWorkout:")
+                    print("DEBUG: ActiveWorkoutView - currentWorkout ID: \(currentWorkout.id)")
+                    print("DEBUG: ActiveWorkoutView - currentWorkout exercises: \(currentWorkout.exercises.count)")
+                    for (index, exercise) in currentWorkout.exercises.enumerated() {
+                        print("DEBUG: ActiveWorkoutView - Exercise \(index): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                        for (setIndex, set) in exercise.sets.enumerated() {
+                            print("DEBUG: ActiveWorkoutView - Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0)")
+                        }
+                    }
+                }
+            }
+            .onChange(of: showingSaveWorkout) { isShowing in
+                if isShowing {
+                    print("DEBUG: ActiveWorkoutView - showingSaveWorkout changed to true")
+                    print("DEBUG: ActiveWorkoutView - currentWorkout at time of showing: \(currentWorkout.id)")
+                    print("DEBUG: ActiveWorkoutView - currentWorkout exercises: \(currentWorkout.exercises.count)")
+                    for (index, exercise) in currentWorkout.exercises.enumerated() {
+                        print("DEBUG: ActiveWorkoutView - Exercise \(index): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                        for (setIndex, set) in exercise.sets.enumerated() {
+                            print("DEBUG: ActiveWorkoutView - Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0)")
+                        }
+                    }
+                }
             }
         }
     }
@@ -219,27 +271,91 @@ struct ActiveWorkoutView: View {
     
     private func completeSet(_ exercise: WorkoutExercise, setIndex: Int) {
         guard let exerciseIndex = currentWorkout.exercises.firstIndex(where: { $0.id == exercise.id }),
-              setIndex < exercise.sets.count else { return }
+              setIndex < currentWorkout.exercises[exerciseIndex].sets.count else { return }
         
-        var updatedExercise = exercise
-        updatedExercise.sets[setIndex].isCompleted.toggle()
-        
+        // Use the current workout's exercise data (which has the updated weight/reps)
         var updatedWorkout = currentWorkout
-        updatedWorkout.exercises[exerciseIndex] = updatedExercise
+        let set = updatedWorkout.exercises[exerciseIndex].sets[setIndex]
+        
+        print("DEBUG: ActiveWorkoutView.completeSet - Set before completion: weight=\(set.weight ?? 0), reps=\(set.reps ?? 0)")
+        
+        // Set isCompleted to true if the set has valid weight and reps data
+        updatedWorkout.exercises[exerciseIndex].sets[setIndex].isCompleted = (set.weight ?? 0) > 0 && (set.reps ?? 0) > 0
+        
+        print("DEBUG: ActiveWorkoutView.completeSet - Setting isCompleted to: \(updatedWorkout.exercises[exerciseIndex].sets[setIndex].isCompleted)")
+        
         currentWorkout = updatedWorkout
     }
     
     private func editSet(_ exercise: WorkoutExercise, setIndex: Int, weight: Double, reps: Int) {
+        print("DEBUG: ActiveWorkoutView.editSet - Exercise: \(exercise.exercise.name), SetIndex: \(setIndex), Weight: \(weight), Reps: \(reps)")
+        
         guard let exerciseIndex = currentWorkout.exercises.firstIndex(where: { $0.id == exercise.id }),
-              setIndex < exercise.sets.count else { return }
+              setIndex < exercise.sets.count else { 
+            print("DEBUG: ActiveWorkoutView.editSet - ERROR: Could not find exercise or setIndex out of bounds")
+            return 
+        }
         
         var updatedExercise = exercise
         updatedExercise.sets[setIndex].weight = weight
         updatedExercise.sets[setIndex].reps = reps
+        updatedExercise.sets[setIndex].isCompleted = true // Set as completed when data is entered
         
         var updatedWorkout = currentWorkout
         updatedWorkout.exercises[exerciseIndex] = updatedExercise
+        
+        print("DEBUG: ActiveWorkoutView.editSet - About to update currentWorkout")
+        print("DEBUG: ActiveWorkoutView.editSet - currentWorkout before update: \(currentWorkout.id)")
+        print("DEBUG: ActiveWorkoutView.editSet - updatedWorkout ID: \(updatedWorkout.id)")
+        
         currentWorkout = updatedWorkout
+        
+        print("DEBUG: ActiveWorkoutView.editSet - currentWorkout after update: \(currentWorkout.id)")
+        print("DEBUG: ActiveWorkoutView.editSet - currentWorkout.exercises.count: \(currentWorkout.exercises.count)")
+        
+        print("DEBUG: ActiveWorkoutView.editSet - Updated workout. Set \(setIndex) now has weight=\(weight), reps=\(reps)")
+        print("DEBUG: ActiveWorkoutView.editSet - currentWorkout now has \(currentWorkout.exercises.count) exercises")
+        for (exIndex, ex) in currentWorkout.exercises.enumerated() {
+            print("DEBUG: ActiveWorkoutView.editSet - Exercise \(exIndex): \(ex.exercise.name) - Sets: \(ex.sets.count)")
+            for (sIndex, s) in ex.sets.enumerated() {
+                print("DEBUG: ActiveWorkoutView.editSet - Set \(sIndex): weight=\(s.weight ?? 0), reps=\(s.reps ?? 0)")
+            }
+        }
+    }
+    
+    private func deleteSet(_ exercise: WorkoutExercise, setIndex: Int) {
+        print("DEBUG: ActiveWorkoutView.deleteSet - Exercise: \(exercise.exercise.name), SetIndex: \(setIndex)")
+        print("DEBUG: ActiveWorkoutView.deleteSet - Current workout ID: \(currentWorkout.id)")
+        print("DEBUG: ActiveWorkoutView.deleteSet - Exercise has \(exercise.sets.count) sets")
+        
+        guard let exerciseIndex = currentWorkout.exercises.firstIndex(where: { $0.id == exercise.id }),
+              setIndex < exercise.sets.count,
+              exercise.sets.count > 1 else { // Don't allow deleting the last set
+            print("DEBUG: ActiveWorkoutView.deleteSet - ERROR: Could not find exercise, setIndex out of bounds, or trying to delete last set")
+            return 
+        }
+        
+        var updatedExercise = exercise
+        updatedExercise.sets.remove(at: setIndex)
+        
+        // Update the order of remaining sets
+        for (index, set) in updatedExercise.sets.enumerated() {
+            updatedExercise.sets[index].order = index + 1
+        }
+        
+        var updatedWorkout = currentWorkout
+        updatedWorkout.exercises[exerciseIndex] = updatedExercise
+        
+        print("DEBUG: ActiveWorkoutView.deleteSet - Deleted set \(setIndex) from exercise '\(exercise.exercise.name)'")
+        print("DEBUG: ActiveWorkoutView.deleteSet - Remaining sets: \(updatedExercise.sets.count)")
+        print("DEBUG: ActiveWorkoutView.deleteSet - Updated workout ID: \(updatedWorkout.id)")
+        
+        currentWorkout = updatedWorkout
+        
+        print("DEBUG: ActiveWorkoutView.deleteSet - After update, currentWorkout has \(currentWorkout.exercises.count) exercises")
+        for (exIndex, ex) in currentWorkout.exercises.enumerated() {
+            print("DEBUG: ActiveWorkoutView.deleteSet - Exercise \(exIndex): \(ex.exercise.name) - Sets: \(ex.sets.count)")
+        }
     }
     
     private func selectExercise(_ index: Int) {
@@ -412,7 +528,8 @@ struct WorkoutSummaryView: View {
                     .foregroundColor(.blue)
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
     }
@@ -507,10 +624,16 @@ struct SetRowView: View {
     @FocusState private var isRepsFocused: Bool
     
     let set: Set
+    let setIndex: Int
     let isCurrent: Bool
     let isCompleted: Bool
+    let exercise: Exercise
+    let dataManager: DataManager
+    let currentWorkoutId: UUID
+    let totalSetsCount: Int
     let onComplete: () -> Void
     let onEdit: (Int, Double, Int) -> Void
+    let onDelete: (Int) -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -526,15 +649,11 @@ struct SetRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             // Weight Input
-            HStack {
-                Image(systemName: "dumbbell")
-                    .foregroundColor(.blue)
-                TextField("0", text: $weight)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .frame(width: 50)
-                    .focused($isWeightFocused)
-            }
+            TextField("0", text: $weight)
+                .keyboardType(.numberPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(width: 50)
+                .focused($isWeightFocused)
             
             // Reps Input
             TextField("0", text: $reps)
@@ -545,36 +664,186 @@ struct SetRowView: View {
             
             // Complete Button
             Button(action: {
+                print("DEBUG: SetRowView - Complete button tapped. Weight: '\(weight)', Reps: '\(reps)', SetIndex: \(setIndex)")
                 if let weightValue = Double(weight), let repsValue = Int(reps) {
-                    onEdit(set.order, weightValue, repsValue)
-                    onComplete()
+                    print("DEBUG: SetRowView - Calling onEdit with setIndex: \(setIndex), weight: \(weightValue), reps: \(repsValue)")
+                    onEdit(setIndex, weightValue, repsValue)
+                    // onComplete() removed - editSet() now handles setting isCompleted
+                } else {
+                    print("DEBUG: SetRowView - ERROR: Could not convert weight '\(weight)' or reps '\(reps)' to numbers")
                 }
             }) {
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(isCompleted ? .green : .gray)
                     .font(.title2)
             }
-            .disabled(weight.isEmpty || reps.isEmpty)
+            .disabled(weight.isEmpty && reps.isEmpty)
+            
+            // Delete Button (only show if more than 1 set)
+            if totalSetsCount > 1 {
+                Button(action: {
+                    onDelete(setIndex)
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                        .font(.title3)
+                }
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(isCurrent ? Color.blue.opacity(0.1) : Color(.systemGray6))
+        .background(isCompleted ? Color.green.opacity(0.2) : (isCurrent ? Color.blue.opacity(0.1) : Color(.systemGray6)))
         .cornerRadius(8)
         .onAppear {
-            if let setWeight = set.weight, let setReps = set.reps {
+            // Only update fields if there's actual saved data, don't clear on initial load
+            if let setWeight = set.weight, setWeight > 0 {
                 weight = String(Int(setWeight))
+            }
+            if let setReps = set.reps, setReps > 0 {
                 reps = String(setReps)
             } else {
-                // Default reps to 10 if not set
-                reps = "10"
+                reps = "10" // Default reps
             }
+        }
+        .onChange(of: set.weight) { _ in
+            updateFieldsFromSet()
+        }
+        .onChange(of: set.reps) { _ in
+            updateFieldsFromSet()
         }
     }
     
-    private var previousPerformance: String {
-        if let reps = set.reps, let weight = set.weight {
-            return "\(Int(weight))lbs × \(reps)"
+    private func updateFieldsFromSet() {
+        print("DEBUG: SetRowView.updateFieldsFromSet - Called for set \(set.order)")
+        print("DEBUG: SetRowView.updateFieldsFromSet - set.weight: \(set.weight ?? 0), set.reps: \(set.reps ?? 0), set.isCompleted: \(set.isCompleted)")
+        print("DEBUG: SetRowView.updateFieldsFromSet - Current weight field: '\(weight)', reps field: '\(reps)'")
+        
+        // Only update weight if we have a valid saved weight
+        if let setWeight = set.weight, setWeight > 0 {
+            print("DEBUG: SetRowView.updateFieldsFromSet - Setting weight to saved value: \(setWeight)")
+            weight = String(Int(setWeight))
+        } else {
+            // Never clear the weight field - preserve user input
+            print("DEBUG: SetRowView.updateFieldsFromSet - Keeping current weight field value: '\(weight)'")
         }
+        
+        // Only update reps if we have a valid saved reps value
+        if let setReps = set.reps, setReps > 0 {
+            print("DEBUG: SetRowView.updateFieldsFromSet - Setting reps to saved value: \(setReps)")
+            reps = String(setReps)
+        } else {
+            // Never clear the reps field - preserve user input or use default
+            if reps.isEmpty {
+                print("DEBUG: SetRowView.updateFieldsFromSet - Setting reps to default: 10")
+                reps = "10" // Default reps only if field is empty
+            } else {
+                print("DEBUG: SetRowView.updateFieldsFromSet - Keeping current reps field value: '\(reps)'")
+            }
+        }
+        
+        print("DEBUG: SetRowView.updateFieldsFromSet - Final weight field: '\(weight)', reps field: '\(reps)'")
+    }
+    
+    private var previousPerformance: String {
+        // Get all workouts that contain this exercise
+        let allWorkouts = dataManager.workouts
+        print("DEBUG: Total workouts in dataManager: \(allWorkouts.count)")
+        
+        let today = Calendar.current.startOfDay(for: Date())
+        print("DEBUG: Today's date: \(today)")
+        
+        // Log all workouts for debugging
+        for (index, workout) in allWorkouts.enumerated() {
+            print("DEBUG: Workout \(index): \(workout.name) - Date: \(workout.date), IsTemplate: \(workout.isTemplate)")
+            for exerciseInWorkout in workout.exercises {
+                print("DEBUG:   - Exercise: \(exerciseInWorkout.exercise.name) (ID: \(exerciseInWorkout.exercise.id)) - Sets: \(exerciseInWorkout.sets.count)")
+                for (setIndex, set) in exerciseInWorkout.sets.enumerated() {
+                    print("DEBUG:     Set \(setIndex + 1): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), order=\(set.order)")
+                }
+            }
+        }
+        
+        let recentWorkouts = allWorkouts
+            .filter { workout in
+                // Exclude templates and the current workout (by comparing workout IDs)
+                let isNotTemplate = !workout.isTemplate
+                let isNotCurrentWorkout = workout.id != currentWorkoutId
+                // Use name-based matching instead of ID matching since IDs are different for each workout
+                let hasExercise = workout.exercises.contains { $0.exercise.name == exercise.name }
+                
+                print("DEBUG: Workout '\(workout.name)': isNotTemplate=\(isNotTemplate), isNotCurrentWorkout=\(isNotCurrentWorkout), hasExercise=\(hasExercise)")
+                
+                return isNotTemplate && isNotCurrentWorkout && hasExercise
+            }
+            .sorted { $0.date > $1.date }
+        
+        print("DEBUG: Previous performance for \(exercise.name) (ID: \(exercise.id))")
+        print("DEBUG: Found \(recentWorkouts.count) recent workouts with this exercise")
+        
+        // Try to find the most recent workout with this exact exercise
+        for workout in recentWorkouts {
+            print("DEBUG: Checking workout: \(workout.name) on \(workout.date)")
+            
+            if let exerciseInWorkout = workout.exercises.first(where: { $0.exercise.name == exercise.name }) {
+                print("DEBUG: Found matching exercise in workout with \(exerciseInWorkout.sets.count) sets")
+                // Log all sets in this exercise for debugging
+                for (setIndex, set) in exerciseInWorkout.sets.enumerated() {
+                    print("DEBUG:   Set \(setIndex + 1): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), order=\(set.order)")
+                }
+                
+                // Find the set that corresponds to the current set number
+                let currentSetNumber = set.order
+                if let previousSet = exerciseInWorkout.sets.first(where: { $0.order == currentSetNumber }) {
+                    print("DEBUG: Previous set \(currentSetNumber) - weight: \(previousSet.weight ?? 0), reps: \(previousSet.reps ?? 0)")
+                    
+                    // Skip sets that have no actual data (weight: 0 and reps: 0 or nil)
+                    if let reps = previousSet.reps, reps > 0 {
+                        if let weight = previousSet.weight, weight > 0 {
+                            // Weighted exercise
+                            let result = "\(Int(weight))lbs × \(reps)"
+                            print("DEBUG: Returning previous performance: \(result)")
+                            return result
+                        } else {
+                            // Bodyweight exercise - show both weight (0) and reps
+                            let result = "0lbs × \(reps)"
+                            print("DEBUG: Returning previous performance (bodyweight): \(result)")
+                            return result
+                        }
+                    } else {
+                        print("DEBUG: Previous set has no valid data (reps: \(previousSet.reps ?? 0), weight: \(previousSet.weight ?? 0))")
+                    }
+                } else {
+                    print("DEBUG: No previous set found for set number \(currentSetNumber)")
+                }
+            } else {
+                print("DEBUG: No matching exercise found in this workout")
+            }
+        }
+        
+        // Fallback: if no exact exercise match, try to find by name
+        print("DEBUG: No exact exercise match found, trying name-based matching")
+        for workout in recentWorkouts {
+            if let exerciseInWorkout = workout.exercises.first(where: { $0.exercise.name == exercise.name }) {
+                print("DEBUG: Found exercise by name: \(exerciseInWorkout.exercise.name)")
+                
+                let currentSetNumber = set.order
+                if let previousSet = exerciseInWorkout.sets.first(where: { $0.order == currentSetNumber }) {
+                    if let reps = previousSet.reps {
+                        if let weight = previousSet.weight {
+                            let result = "\(Int(weight))lbs × \(reps)"
+                            print("DEBUG: Returning previous performance (by name): \(result)")
+                            return result
+                        } else {
+                            let result = "0lbs × \(reps)"
+                            print("DEBUG: Returning previous performance (by name, bodyweight): \(result)")
+                            return result
+                        }
+                    }
+                }
+            }
+        }
+        
+        print("DEBUG: No previous performance found, returning '-'")
         return "-"
     }
 }
@@ -640,13 +909,22 @@ struct WorkoutCompleteView: View {
 
 struct ExerciseCard: View {
     let exercise: WorkoutExercise
+    let currentWorkout: Workout
     let exerciseNumber: Int
     let totalExercises: Int
+    let dataManager: DataManager
+    let currentWorkoutId: UUID
     let onAddSet: () -> Void
     let onEditSet: (Int, Double, Int) -> Void
     let onCompleteSet: (Int) -> Void
+    let onDeleteSet: (WorkoutExercise, Int) -> Void
     let onTap: () -> Void
     let onShowOptions: () -> Void
+    
+    // Get the current exercise data from the current workout
+    private var currentExercise: WorkoutExercise {
+        currentWorkout.exercises.first { $0.id == exercise.id } ?? exercise
+    }
     
     var body: some View {
         Button(action: onTap) {
@@ -731,7 +1009,7 @@ struct ExerciseCard: View {
                 
                 // Sets Table
                 VStack(spacing: 8) {
-                    // Table Headers
+                    // Table Headers (no background box)
                     HStack(spacing: 12) {
                         Text("SET")
                             .font(.caption)
@@ -743,14 +1021,15 @@ struct ExerciseCard: View {
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        HStack {
+                        HStack(spacing: 2) {
                             Image(systemName: "dumbbell")
                                 .foregroundColor(.blue)
+                                .font(.caption)
                             Text("LBS")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                         }
-                        .frame(width: 50)
+                        .frame(width: 60)
                         
                         Text("REPS")
                             .font(.caption)
@@ -764,22 +1043,30 @@ struct ExerciseCard: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
                     
                     // Sets Rows
-                    ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
-                        SetRowView(
-                            set: set,
-                            isCurrent: false, // No current set highlighting
-                            isCompleted: set.isCompleted,
-                            onComplete: {
-                                onCompleteSet(index)
-                            },
-                            onEdit: { setOrder, weight, reps in
-                                onEditSet(index, weight, reps)
-                            }
-                        )
+                    VStack(spacing: 8) {
+                        ForEach(Array(currentExercise.sets.enumerated()), id: \.element.id) { index, set in
+                            SetRowView(
+                                set: set,
+                                setIndex: index,
+                                isCurrent: false, // No current set highlighting
+                                isCompleted: set.isCompleted,
+                                exercise: exercise.exercise,
+                                dataManager: dataManager,
+                                currentWorkoutId: currentWorkoutId,
+                                totalSetsCount: currentExercise.sets.count,
+                                onComplete: {
+                                    onCompleteSet(index)
+                                },
+                                onEdit: { setOrder, weight, reps in
+                                    onEditSet(index, weight, reps)
+                                },
+                                onDelete: { setIndex in
+                                    onDeleteSet(exercise, setIndex)
+                                }
+                            )
+                        }
                     }
                     
                     // Add Set Button
@@ -798,7 +1085,8 @@ struct ExerciseCard: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)

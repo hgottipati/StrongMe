@@ -35,12 +35,41 @@ class DataManager: ObservableObject {
     }
     
     func saveWorkout(_ workout: Workout) {
+        print("DEBUG: DataManager.saveWorkout - Saving workout: \(workout.name)")
+        print("DEBUG: DataManager.saveWorkout - Workout ID: \(workout.id)")
+        print("DEBUG: DataManager.saveWorkout - Number of exercises: \(workout.exercises.count)")
+        
+        for (index, exercise) in workout.exercises.enumerated() {
+            print("DEBUG: DataManager.saveWorkout - Exercise \(index): \(exercise.exercise.name)")
+            print("DEBUG: DataManager.saveWorkout - Number of sets: \(exercise.sets.count)")
+            for (setIndex, set) in exercise.sets.enumerated() {
+                print("DEBUG: DataManager.saveWorkout - Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), order=\(set.order)")
+            }
+        }
+        
         if let index = workouts.firstIndex(where: { $0.id == workout.id }) {
+            print("DEBUG: DataManager.saveWorkout - Updating existing workout at index \(index)")
             workouts[index] = workout
         } else {
+            print("DEBUG: DataManager.saveWorkout - Adding new workout")
             workouts.append(workout)
         }
+        
+        print("DEBUG: DataManager.saveWorkout - Total workouts after save: \(workouts.count)")
+        
+        // Log all workouts after save for debugging
+        for (index, savedWorkout) in workouts.enumerated() {
+            print("DEBUG: DataManager.saveWorkout - Saved workout \(index): \(savedWorkout.name) (ID: \(savedWorkout.id))")
+            for exercise in savedWorkout.exercises {
+                print("DEBUG: DataManager.saveWorkout -   Exercise: \(exercise.exercise.name)")
+                for (setIndex, set) in exercise.sets.enumerated() {
+                    print("DEBUG: DataManager.saveWorkout -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0)")
+                }
+            }
+        }
+        
         persistenceManager.saveWorkouts(workouts)
+        print("DEBUG: DataManager.saveWorkout - Data saved to persistence")
     }
     
     func deleteWorkout(_ workout: Workout) {
@@ -76,6 +105,28 @@ class DataManager: ObservableObject {
             loadSampleWorkouts()
         } else {
             workouts = savedWorkouts
+            // Always ensure we have some sample data for previous values
+            ensureSampleDataExists()
+        }
+    }
+    
+    private func ensureSampleDataExists() {
+        // Check if we have any workouts with Bench Press or Push-ups
+        let hasBenchPress = workouts.contains { workout in
+            workout.exercises.contains { $0.exercise.name == "Bench Press" }
+        }
+        let hasPushUps = workouts.contains { workout in
+            workout.exercises.contains { $0.exercise.name == "Push-ups" }
+        }
+        
+        print("DEBUG: DataManager - hasBenchPress: \(hasBenchPress), hasPushUps: \(hasPushUps)")
+        print("DEBUG: DataManager - Total workouts: \(workouts.count)")
+        
+        // If we don't have sample exercises, add them
+        if !hasBenchPress || !hasPushUps {
+            print("DEBUG: Adding sample data for previous values")
+            loadSampleWorkouts()
+            print("DEBUG: DataManager - After adding sample data, total workouts: \(workouts.count)")
         }
     }
     
@@ -137,7 +188,37 @@ class DataManager: ObservableObject {
     }
     
     private func loadSampleWorkouts() {
-        let sampleWorkout = Workout(
+        print("DEBUG: DataManager - Loading sample workouts")
+        
+        // Add a previous workout from 2 days ago
+        let previousWorkout = Workout(
+            name: "Previous Push Day",
+            exercises: [
+                WorkoutExercise(
+                    exercise: exerciseLibrary.first { $0.name == "Bench Press" }!,
+                    sets: [
+                        Set(reps: 12, weight: 55, order: 1),
+                        Set(reps: 10, weight: 65, order: 2),
+                        Set(reps: 8, weight: 75, order: 3)
+                    ],
+                    order: 1
+                ),
+                WorkoutExercise(
+                    exercise: exerciseLibrary.first { $0.name == "Push-ups" }!,
+                    sets: [
+                        Set(reps: 15, weight: nil, order: 1),
+                        Set(reps: 12, weight: nil, order: 2),
+                        Set(reps: 10, weight: nil, order: 3)
+                    ],
+                    order: 2
+                )
+            ],
+            date: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
+        )
+        workouts.append(previousWorkout)
+        
+        // Add a more recent workout from yesterday
+        let recentWorkout = Workout(
             name: "Push Day",
             exercises: [
                 WorkoutExercise(
@@ -161,7 +242,12 @@ class DataManager: ObservableObject {
             ],
             date: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         )
-        workouts.append(sampleWorkout)
+        workouts.append(recentWorkout)
+        
+        print("DEBUG: DataManager - Added \(workouts.count) sample workouts")
+        for (index, workout) in workouts.enumerated() {
+            print("DEBUG: DataManager - Workout \(index): \(workout.name) on \(workout.date)")
+        }
     }
     
     private func loadSampleUser() {

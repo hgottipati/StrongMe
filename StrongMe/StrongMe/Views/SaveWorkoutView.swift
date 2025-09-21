@@ -239,6 +239,7 @@ struct SaveWorkoutView: View {
             for (index, currentExercise) in workout.exercises.enumerated() {
                 if index < originalWorkout.exercises.count {
                     let originalExercise = originalWorkout.exercises[index]
+                    print("DEBUG: SaveWorkoutView - Comparing exercise \(index): '\(originalExercise.exercise.name)' (ID: \(originalExercise.exercise.id)) vs '\(currentExercise.exercise.name)' (ID: \(currentExercise.exercise.id))")
                     if currentExercise.exercise.id != originalExercise.exercise.id {
                         print("DEBUG: SaveWorkoutView - Exercise at index \(index) changed from '\(originalExercise.exercise.name)' to '\(currentExercise.exercise.name)'")
                         exerciseContentChanged = true
@@ -248,8 +249,33 @@ struct SaveWorkoutView: View {
             }
         }
         
-        hasWorkoutChanged = exerciseCountChanged || exerciseContentChanged
+        // Check if any sets were modified (added, removed, or changed)
+        var setChangesDetected = false
+        if workout.exercises.count == originalWorkout.exercises.count {
+            for (index, currentExercise) in workout.exercises.enumerated() {
+                if index < originalWorkout.exercises.count {
+                    let originalExercise = originalWorkout.exercises[index]
+                    
+                    // Check if number of sets changed
+                    if currentExercise.sets.count != originalExercise.sets.count {
+                        print("DEBUG: SaveWorkoutView - Sets count changed for exercise '\(currentExercise.exercise.name)': \(originalExercise.sets.count) -> \(currentExercise.sets.count)")
+                        setChangesDetected = true
+                        break
+                    }
+                    
+                    // Check if any set values changed (but don't treat individual set updates as "changes")
+                    // Individual set weight/reps updates are normal workout logging, not structural changes
+                    // Only detect if sets were added/removed (handled above) or if there are other structural changes
+                    // Individual set value updates (weight, reps, isCompleted) are expected during workout logging
+                    
+                    if setChangesDetected { break }
+                }
+            }
+        }
+        
+        hasWorkoutChanged = exerciseCountChanged || exerciseContentChanged || setChangesDetected
         print("DEBUG: SaveWorkoutView - exerciseContentChanged: \(exerciseContentChanged)")
+        print("DEBUG: SaveWorkoutView - setChangesDetected: \(setChangesDetected)")
         print("DEBUG: SaveWorkoutView - hasWorkoutChanged: \(hasWorkoutChanged)")
         
         // Log alert message details
@@ -274,8 +300,15 @@ struct SaveWorkoutView: View {
     }
     
     private func keepOriginalRoutine() {
-        // Keep original routine, just save the workout
-        finalizeWorkout()
+        // Keep original routine, revert to original workout and save it
+        var originalWorkoutCopy = originalWorkout
+        originalWorkoutCopy.name = workoutName
+        
+        // Use DataManager's saveWorkout method to properly update the state with original workout
+        dataManager.saveWorkout(originalWorkoutCopy)
+        
+        // Navigate to celebration screen
+        showingCelebration = true
     }
     
     private func finalizeWorkout() {
