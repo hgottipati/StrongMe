@@ -7,7 +7,6 @@
 
 import XCTest
 @testable import StrongMe
-@testable import StrongMe
 
 class WorkoutModelTests: XCTestCase {
     
