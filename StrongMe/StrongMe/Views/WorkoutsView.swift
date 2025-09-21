@@ -824,7 +824,7 @@ struct ModernWorkoutCardView: View {
 // MARK: - Workout Drop Delegate
 struct WorkoutDropDelegate: DropDelegate {
     let workout: Workout
-    @EnvironmentObject var dataManager: DataManager
+    let dataManager: DataManager
     @Binding var draggedWorkout: Workout?
     @Binding var dragOffset: CGSize
     
@@ -942,6 +942,7 @@ struct AdhocWorkoutsView: View {
                 }
                 .onDrop(of: [.text], delegate: WorkoutDropDelegate(
                     workout: workout,
+                    dataManager: dataManager,
                     draggedWorkout: $draggedWorkout,
                     dragOffset: $dragOffset
                 ))
