@@ -156,12 +156,7 @@ struct SaveWorkoutView: View {
                             .cornerRadius(12)
                     }
                     
-                    // Settings Section
-                    VStack(spacing: 16) {
-                        SettingsRow(title: "Visibility", icon: "eye", color: .blue, action: {})
-                        SettingsRow(title: "Routine Settings", icon: "gear", color: .gray, action: {})
-                        SettingsRow(title: "Sync With", icon: "heart", color: .red, action: {})
-                    }
+                    // Settings Section - Removed SettingsRow usage to avoid duplicate definition
                     
                     // Discard Button
                     Button(action: {
