@@ -867,6 +867,7 @@ struct AdhocWorkoutsView: View {
     @Binding var selectedWorkout: Workout?
     @Binding var showingWorkoutOverview: Workout?
     @State private var lastReorderIndex: Int? = nil
+    @State private var hasDragged: Bool = false
     
     var body: some View {
         LazyVStack(spacing: 16) {
@@ -874,7 +875,10 @@ struct AdhocWorkoutsView: View {
                 ModernWorkoutCardView(
                     workout: workout,
                     onTap: {
-                        selectedWorkout = workout
+                        // Only open if we haven't dragged
+                        if !hasDragged {
+                            selectedWorkout = workout
+                        }
                     },
                     onStartWorkout: {
                         startWorkout(workout)
@@ -895,38 +899,38 @@ struct AdhocWorkoutsView: View {
                 .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
                 .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
                 .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
+                .zIndex(draggedWorkout?.id == workout.id ? 1 : 0)
                 .gesture(
-                    LongPressGesture(minimumDuration: 0.3)
-                        .sequenced(before: DragGesture())
+                    DragGesture(minimumDistance: 10)
                         .onChanged { value in
-                            switch value {
-                            case .first(true):
-                                // Long press started
+                            print("DEBUG: DragGesture onChanged - translation: \(value.translation)")
+                            
+                            // Mark that we've started dragging
+                            if !hasDragged {
+                                hasDragged = true
                                 draggedWorkout = workout
-                                // Provide haptic feedback when long press starts
+                                print("DEBUG: Drag started for workout: \(workout.name)")
+                                
+                                // Provide haptic feedback when drag starts
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                                 impactFeedback.impactOccurred()
-                                
-                            case .second(true, let drag):
-                                // Long press + drag started
-                                if let dragValue = drag {
-                                    // Only allow vertical movement (constrain X to 0)
-                                    let constrainedOffset = CGSize(width: 0, height: dragValue.translation.height)
-                                    dragOffset = constrainedOffset
-                                    
-                                    // Check if we should reorder based on vertical position
-                                    checkForReorder(dragOffset: constrainedOffset)
-                                }
-                                
-                            default:
-                                break
                             }
+                            
+                            // Only allow vertical movement (constrain X to 0)
+                            let constrainedOffset = CGSize(width: 0, height: value.translation.height)
+                            dragOffset = constrainedOffset
+                            
+                            // Check if we should reorder based on vertical position
+                            checkForReorder(dragOffset: constrainedOffset)
                         }
                         .onEnded { value in
+                            print("DEBUG: DragGesture onEnded - final translation: \(value.translation)")
+                            
                             // Reset drag state
                             draggedWorkout = nil
                             dragOffset = .zero
                             lastReorderIndex = nil
+                            hasDragged = false
                             
                             // Provide success feedback
                             let successFeedback = UINotificationFeedbackGenerator()
@@ -943,28 +947,38 @@ struct AdhocWorkoutsView: View {
     private func checkForReorder(dragOffset: CGSize) {
         guard let draggedWorkout = draggedWorkout else { return }
         
-        // Calculate the threshold for reordering (card height)
-        let reorderThreshold: CGFloat = 80
+        // Calculate the threshold for reordering (smaller threshold for better responsiveness)
+        let reorderThreshold: CGFloat = 50
+        
+        // Debug logging
+        print("DEBUG: checkForReorder - dragOffset.height: \(dragOffset.height), threshold: \(reorderThreshold)")
         
         // Check if the dragged card has moved enough to trigger a reorder
         if abs(dragOffset.height) > reorderThreshold {
             // Find current position of dragged workout
-            guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }) else { return }
+            guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkout.id }) else { 
+                print("DEBUG: Could not find dragged workout index")
+                return 
+            }
             
             // Calculate new position based on drag direction
             let newIndex: Int
             if dragOffset.height < -reorderThreshold {
                 // Moving up - move to previous position
                 newIndex = max(0, draggedIndex - 1)
+                print("DEBUG: Moving UP - draggedIndex: \(draggedIndex), newIndex: \(newIndex)")
             } else if dragOffset.height > reorderThreshold {
                 // Moving down - move to next position
                 newIndex = min(dataManager.workouts.count - 1, draggedIndex + 1)
+                print("DEBUG: Moving DOWN - draggedIndex: \(draggedIndex), newIndex: \(newIndex)")
             } else {
                 return // No reorder needed
             }
             
             // Only reorder if the new position is different and valid, and we haven't already reordered to this position
             if newIndex != draggedIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && lastReorderIndex != newIndex {
+                print("DEBUG: Performing reorder from \(draggedIndex) to \(newIndex)")
+                
                 // Perform the reorder with animation
                 withAnimation(.easeInOut(duration: 0.3)) {
                     dataManager.workouts.move(fromOffsets: IndexSet(integer: draggedIndex), toOffset: newIndex)
@@ -976,6 +990,8 @@ struct AdhocWorkoutsView: View {
                 
                 // Track this reorder to prevent multiple reorders to the same position
                 lastReorderIndex = newIndex
+            } else {
+                print("DEBUG: Reorder skipped - newIndex: \(newIndex), draggedIndex: \(draggedIndex), lastReorderIndex: \(lastReorderIndex ?? -1)")
             }
         }
     }
