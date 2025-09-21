@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WorkoutsView: View {
     @EnvironmentObject var dataManager: DataManager
@@ -92,106 +93,120 @@ struct WorkoutsView: View {
                         showingNewWorkout = true
                     }
                 } else {
-                    List {
-                        ForEach(dataManager.workouts) { workout in
-                            WorkoutCardView(
-                                workout: workout,
-                                dataManager: dataManager,
-                                onTap: {
-                                    selectedWorkout = workout
-                                },
-                                onStartWorkout: {
-                                    print("DEBUG: WorkoutsView - Starting workout: \(workout.name)")
-                                    print("DEBUG: WorkoutsView - Workout ID: \(workout.id)")
-                                    print("DEBUG: WorkoutsView - Exercise count: \(workout.exercises.count)")
-                                    for (exIndex, exercise) in workout.exercises.enumerated() {
-                                        print("DEBUG: WorkoutsView - Exercise \(exIndex): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
-                                        for (setIndex, set) in exercise.sets.enumerated() {
-                                            print("DEBUG: WorkoutsView -   Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                    ScrollView {
+                        LazyVStack(spacing: 20) {
+                            // Weekly Overview Section
+                            WeeklyOverviewSection(dataManager: dataManager)
+                            
+                            // Workouts List
+                            ForEach(Array(dataManager.workouts.enumerated()), id: \.element.id) { index, workout in
+                                ModernWorkoutCardView(
+                                    workout: workout,
+                                    dataManager: dataManager,
+                                    onTap: {
+                                        selectedWorkout = workout
+                                    },
+                                    onStartWorkout: {
+                                        print("DEBUG: WorkoutsView - Starting workout: \(workout.name)")
+                                        print("DEBUG: WorkoutsView - Workout ID: \(workout.id)")
+                                        print("DEBUG: WorkoutsView - Exercise count: \(workout.exercises.count)")
+                                        for (exIndex, exercise) in workout.exercises.enumerated() {
+                                            print("DEBUG: WorkoutsView - Exercise \(exIndex): \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                                            for (setIndex, set) in exercise.sets.enumerated() {
+                                                print("DEBUG: WorkoutsView -   Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                            }
                                         }
-                                    }
-                                    
-                                    // Find the most recent modified workout with the same name
-                                    let recentModifiedWorkout = dataManager.workouts
-                                        .filter { $0.name == workout.name && $0.id != workout.id }
-                                        .filter { w in
-                                            w.exercises.contains { exercise in
-                                                exercise.sets.contains { set in
-                                                    (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
+                                        
+                                        // Find the most recent modified workout with the same name
+                                        let recentModifiedWorkout = dataManager.workouts
+                                            .filter { $0.name == workout.name && $0.id != workout.id }
+                                            .filter { w in
+                                                w.exercises.contains { exercise in
+                                                    exercise.sets.contains { set in
+                                                        (set.weight ?? 0) > 0 || (set.reps ?? 0) > 0 || set.isCompleted
+                                                    }
                                                 }
                                             }
-                                        }
-                                        .sorted { $0.date > $1.date }
-                                        .first
-                                    
-                                    if let recentWorkout = recentModifiedWorkout {
-                                        print("DEBUG: WorkoutsView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
-                                        print("DEBUG: WorkoutsView - Recent workout sets:")
-                                        for exercise in recentWorkout.exercises {
-                                            print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
-                                            for (setIndex, set) in exercise.sets.enumerated() {
-                                                print("DEBUG: WorkoutsView -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
-                                            }
-                                        }
-                                        // Create a new workout instance based on the recent workout's structure, but with fresh completion states
-                                        let newWorkout = Workout(
-                                            name: recentWorkout.name,
-                                            exercises: recentWorkout.exercises.map { exercise in
-                                                WorkoutExercise(
-                                                    exercise: exercise.exercise,
-                                                    sets: exercise.sets.map { set in
-                                                        Set(
-                                                            reps: set.reps ?? 10, // Keep the reps from previous session
-                                                            weight: set.weight, // Keep the weight from previous session
-                                                            duration: set.duration,
-                                                            distance: set.distance,
-                                                            restTime: set.restTime,
-                                                            isCompleted: false, // Start as not completed for new session
-                                                            order: set.order
-                                                        )
-                                                    },
-                                                    notes: exercise.notes,
-                                                    order: exercise.order
-                                                )
-                                            },
-                                            date: Date(), // New date for new session
-                                            duration: nil,
-                                            notes: recentWorkout.notes,
-                                            isTemplate: false
-                                        )
+                                            .sorted { $0.date > $1.date }
+                                            .first
                                         
-                                        print("DEBUG: WorkoutsView - Created new workout from recent modified workout: \(newWorkout.name)")
-                                        print("DEBUG: WorkoutsView - New workout ID: \(newWorkout.id)")
-                                        print("DEBUG: WorkoutsView - New workout sets:")
-                                        for exercise in newWorkout.exercises {
-                                            print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name)")
-                                            for (index, set) in exercise.sets.enumerated() {
-                                                print("DEBUG: WorkoutsView -     Set \(index): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                        if let recentWorkout = recentModifiedWorkout {
+                                            print("DEBUG: WorkoutsView - Found recent modified workout: \(recentWorkout.name) (ID: \(recentWorkout.id))")
+                                            print("DEBUG: WorkoutsView - Recent workout sets:")
+                                            for exercise in recentWorkout.exercises {
+                                                print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name) - Sets: \(exercise.sets.count)")
+                                                for (setIndex, set) in exercise.sets.enumerated() {
+                                                    print("DEBUG: WorkoutsView -     Set \(setIndex): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                                }
                                             }
+                                            // Create a new workout instance based on the recent workout's structure, but with fresh completion states
+                                            let newWorkout = Workout(
+                                                name: recentWorkout.name,
+                                                exercises: recentWorkout.exercises.map { exercise in
+                                                    WorkoutExercise(
+                                                        exercise: exercise.exercise,
+                                                        sets: exercise.sets.map { set in
+                                                            Set(
+                                                                reps: set.reps ?? 10, // Keep the reps from previous session
+                                                                weight: set.weight, // Keep the weight from previous session
+                                                                duration: set.duration,
+                                                                distance: set.distance,
+                                                                restTime: set.restTime,
+                                                                isCompleted: false, // Start as not completed for new session
+                                                                order: set.order
+                                                            )
+                                                        },
+                                                        notes: exercise.notes,
+                                                        order: exercise.order
+                                                    )
+                                                },
+                                                date: Date(), // New date for new session
+                                                duration: nil,
+                                                notes: recentWorkout.notes,
+                                                isTemplate: false
+                                            )
+                                            
+                                            print("DEBUG: WorkoutsView - Created new workout from recent modified workout: \(newWorkout.name)")
+                                            print("DEBUG: WorkoutsView - New workout ID: \(newWorkout.id)")
+                                            print("DEBUG: WorkoutsView - New workout sets:")
+                                            for exercise in newWorkout.exercises {
+                                                print("DEBUG: WorkoutsView -   Exercise: \(exercise.exercise.name)")
+                                                for (index, set) in exercise.sets.enumerated() {
+                                                    print("DEBUG: WorkoutsView -     Set \(index): weight=\(set.weight ?? 0), reps=\(set.reps ?? 0), isCompleted=\(set.isCompleted)")
+                                                }
+                                            }
+                                            
+                                            showingWorkoutOverview = newWorkout
+                                        } else {
+                                            print("DEBUG: WorkoutsView - No recent modified workout found, using template")
+                                            showingWorkoutOverview = workout
                                         }
-                                        
-                                        showingWorkoutOverview = newWorkout
-                                    } else {
-                                        print("DEBUG: WorkoutsView - No recent modified workout found, using template")
-                                        showingWorkoutOverview = workout
+                                    },
+                                    onShare: {
+                                        shareWorkout(workout)
+                                    },
+                                    onDuplicate: {
+                                        duplicateWorkout(workout)
+                                    },
+                                    onEdit: {
+                                        editWorkout(workout)
+                                    },
+                                    onDelete: {
+                                        deleteWorkout(workout)
                                     }
-                                },
-                                onShare: {
-                                    shareWorkout(workout)
-                                },
-                                onDuplicate: {
-                                    duplicateWorkout(workout)
-                                },
-                                onEdit: {
-                                    editWorkout(workout)
-                                },
-                                onDelete: {
-                                    deleteWorkout(workout)
+                                )
+                                .onDrag {
+                                    return NSItemProvider(object: workout.id.uuidString as NSString)
                                 }
-                            )
+                                .onDrop(of: [.text], delegate: WorkoutDropDelegate(
+                                    workout: workout,
+                                    dataManager: dataManager,
+                                    moveWorkouts: moveWorkouts
+                                ))
+                            }
                         }
-                        .onMove(perform: moveWorkouts)
-                        .listStyle(PlainListStyle())
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
                     }
                 }
             }
@@ -492,6 +507,320 @@ struct WorkoutSheetView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Weekly Overview Section
+struct WeeklyOverviewSection: View {
+    let dataManager: DataManager
+    
+    private var currentWeekWorkouts: [Workout] {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+        let endOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.end ?? now
+        
+        return dataManager.workouts.filter { workout in
+            workout.date >= startOfWeek && workout.date < endOfWeek
+        }.sorted { $0.date < $1.date }
+    }
+    
+    private var weekDays: [Date] {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+        
+        return (0..<7).compactMap { dayOffset in
+            calendar.date(byAdding: .day, value: dayOffset, to: startOfWeek)
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("This Week")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("\(currentWeekWorkouts.count) workouts")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Week days with dots
+            HStack(spacing: 12) {
+                ForEach(weekDays, id: \.self) { day in
+                    VStack(spacing: 8) {
+                        Text(day, format: .dateTime.weekday(.abbreviated))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text(day, format: .dateTime.day())
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        // Dot indicator
+                        Circle()
+                            .fill(hasWorkoutOnDay(day) ? Color.blue : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(Color(.systemGray6))
+            .cornerRadius(16)
+        }
+        .padding(.horizontal, 4)
+    }
+    
+    private func hasWorkoutOnDay(_ day: Date) -> Bool {
+        let calendar = Calendar.current
+        return currentWeekWorkouts.contains { workout in
+            calendar.isDate(workout.date, inSameDayAs: day)
+        }
+    }
+}
+
+// MARK: - Modern Workout Card View
+struct ModernWorkoutCardView: View {
+    let workout: Workout
+    let dataManager: DataManager
+    let onTap: () -> Void
+    let onStartWorkout: () -> Void
+    let onShare: () -> Void
+    let onDuplicate: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    
+    private var exerciseCount: Int {
+        workout.exercises.count
+    }
+    
+    private var totalSets: Int {
+        workout.exercises.flatMap { $0.sets }.count
+    }
+    
+    private var completedSets: Int {
+        workout.exercises.flatMap { $0.sets }.filter { $0.isCompleted }.count
+    }
+    
+    private var isCompleted: Bool {
+        let totalSets = workout.exercises.flatMap { $0.sets }.count
+        return totalSets > 0 && completedSets == totalSets
+    }
+    
+    private var progressPercentage: Double {
+        guard totalSets > 0 else { return 0 }
+        return Double(completedSets) / Double(totalSets)
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 16) {
+                // Header with title, date, and menu
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workout.name)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text(workout.date, style: .date)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 16) {
+                        // Stats
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("\(exerciseCount) exercises")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(completedSets)/\(totalSets) sets")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // 3-dot menu
+                        Menu {
+                            Button(action: onShare) {
+                                Label("Share Workout", systemImage: "square.and.arrow.up")
+                            }
+                            
+                            Button(action: onDuplicate) {
+                                Label("Duplicate Workout", systemImage: "doc.on.doc")
+                            }
+                            
+                            Button(action: onEdit) {
+                                Label("Edit Workout", systemImage: "pencil")
+                            }
+                            
+                            Divider()
+                            
+                            Button(action: onDelete) {
+                                Label("Delete Workout", systemImage: "trash")
+                            }
+                            .foregroundColor(.red)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                                .padding(8)
+                                .background(Color(.systemGray6))
+                                .clipShape(Circle())
+                        }
+                    }
+                }
+                
+                // Progress section
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Progress")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Text("\(Int(progressPercentage * 100))%")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    // Modern progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(.systemGray5))
+                                .frame(height: 8)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.blue, .blue.opacity(0.8)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progressPercentage, height: 8)
+                        }
+                    }
+                    .frame(height: 8)
+                }
+                
+                // Bottom section with duration and action
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Duration: \(formatDuration(workout.duration ?? 0))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if isCompleted {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.subheadline)
+                            Text("Completed")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(20)
+                    } else {
+                        Button(action: onStartWorkout) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.subheadline)
+                                Text("Start")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                LinearGradient(
+                                    colors: [.blue, .blue.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(20)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Workout Drop Delegate
+struct WorkoutDropDelegate: DropDelegate {
+    let workout: Workout
+    let dataManager: DataManager
+    let moveWorkouts: (IndexSet, Int) -> Void
+    
+    func dropEntered(info: DropInfo) {
+        // Optional: Add visual feedback when dragging over
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let item = info.itemProviders(for: [.text]).first else { return false }
+        
+        item.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
+            if let data = data as? Data,
+               let workoutIdString = String(data: data, encoding: .utf8),
+               let draggedWorkoutId = UUID(uuidString: workoutIdString) {
+                
+                DispatchQueue.main.async {
+                    // Find the indices
+                    guard let draggedIndex = dataManager.workouts.firstIndex(where: { $0.id == draggedWorkoutId }),
+                          let targetIndex = dataManager.workouts.firstIndex(where: { $0.id == workout.id }) else { return }
+                    
+                    // Only move if it's actually a different position
+                    if draggedIndex != targetIndex {
+                        let indexSet = IndexSet(integer: draggedIndex)
+                        moveWorkouts(indexSet, targetIndex)
+                    }
+                }
+            }
+        }
+        
+        return true
     }
 }
 
