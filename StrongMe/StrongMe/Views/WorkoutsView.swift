@@ -878,71 +878,73 @@ struct AdhocWorkoutsView: View {
     var body: some View {
         let _ = print("DEBUG: AdhocWorkoutsView - body called - isReorderMode: \(isReorderMode), workouts count: \(dataManager.workouts.count)")
         
-        if isReorderMode {
-            // Reorder mode - show simple list with reordering
-            if dataManager.workouts.isEmpty {
-                VStack {
-                    Text("No workouts to reorder")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding()
-                }
-            } else {
-                List {
-                    ForEach(dataManager.workouts) { workout in
-                        HStack {
-                            Image(systemName: "line.3.horizontal")
-                                .foregroundColor(.secondary)
-                                .padding(.trailing, 8)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(workout.name)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
+        Group {
+            if isReorderMode {
+                // Reorder mode - show simple list with reordering
+                if dataManager.workouts.isEmpty {
+                    VStack {
+                        Text("No workouts to reorder")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .padding()
+                    }
+                } else {
+                    List {
+                        ForEach(dataManager.workouts) { workout in
+                            HStack {
+                                Image(systemName: "line.3.horizontal")
+                                    .foregroundColor(.secondary)
+                                    .padding(.trailing, 8)
                                 
-                                Text(workout.date, style: .date)
-                                    .font(.subheadline)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(workout.name)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text(workout.date, style: .date)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Text("\(workout.exercises.count) exercises")
+                                    .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            
-                            Spacer()
-                            
-                            Text("\(workout.exercises.count) exercises")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            .padding(.vertical, 8)
                         }
-                        .padding(.vertical, 8)
+                        .onMove(perform: moveWorkouts)
                     }
-                    .onMove(perform: moveWorkouts)
+                    .listStyle(PlainListStyle())
+                    .environment(\.editMode, .constant(.active))
                 }
-                .listStyle(PlainListStyle())
-                .environment(\.editMode, .constant(.active))
-            }
-        } else {
-            // Normal mode - show modern cards
-            LazyVStack(spacing: 16) {
-                ForEach(dataManager.workouts) { workout in
-                    ModernWorkoutCardView(
-                        workout: workout,
-                        onTap: {
-                            selectedWorkout = workout
-                        },
-                        onStartWorkout: {
-                            startWorkout(workout)
-                        },
-                        onShare: {
-                            onShareWorkout(workout)
-                        },
-                        onDuplicate: {
-                            onDuplicateWorkout(workout)
-                        },
-                        onEdit: {
-                            onEditWorkout(workout)
-                        },
-                        onDelete: {
-                            onDeleteWorkout(workout)
-                        }
-                    )
+            } else {
+                // Normal mode - show modern cards
+                LazyVStack(spacing: 16) {
+                    ForEach(dataManager.workouts) { workout in
+                        ModernWorkoutCardView(
+                            workout: workout,
+                            onTap: {
+                                selectedWorkout = workout
+                            },
+                            onStartWorkout: {
+                                startWorkout(workout)
+                            },
+                            onShare: {
+                                onShareWorkout(workout)
+                            },
+                            onDuplicate: {
+                                onDuplicateWorkout(workout)
+                            },
+                            onEdit: {
+                                onEditWorkout(workout)
+                            },
+                            onDelete: {
+                                onDeleteWorkout(workout)
+                            }
+                        )
+                    }
                 }
             }
         }
