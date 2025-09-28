@@ -220,16 +220,31 @@ class DataManager: ObservableObject {
     
     private func loadSampleWorkouts() {
         print("DEBUG: DataManager - Loading sample workouts")
+        print("DEBUG: DataManager - Exercise library count: \(exerciseLibrary.count)")
         
         // Clear existing workouts first to prevent duplicates
         workouts.removeAll()
+        
+        // Ensure we have exercises loaded
+        guard !exerciseLibrary.isEmpty else {
+            print("DEBUG: DataManager - Exercise library is empty, cannot create sample workouts")
+            return
+        }
+        
+        // Find exercises safely
+        guard let benchPress = exerciseLibrary.first(where: { $0.name == "Bench Press" }),
+              let pushUps = exerciseLibrary.first(where: { $0.name == "Push-ups" }),
+              let dumbbellPress = exerciseLibrary.first(where: { $0.name == "Dumbbell Press" }) else {
+            print("DEBUG: DataManager - Required exercises not found in library")
+            return
+        }
         
         // Add a previous workout from 2 days ago
         let previousWorkout = Workout(
             name: "Previous Push Day",
             exercises: [
                 WorkoutExercise(
-                    exercise: exerciseLibrary.first { $0.name == "Bench Press" }!,
+                    exercise: benchPress,
                     sets: [
                         Set(reps: 12, weight: 55, order: 1),
                         Set(reps: 10, weight: 65, order: 2),
@@ -238,7 +253,7 @@ class DataManager: ObservableObject {
                     order: 1
                 ),
                 WorkoutExercise(
-                    exercise: exerciseLibrary.first { $0.name == "Push-ups" }!,
+                    exercise: pushUps,
                     sets: [
                         Set(reps: 15, weight: nil, order: 1),
                         Set(reps: 12, weight: nil, order: 2),
@@ -256,7 +271,7 @@ class DataManager: ObservableObject {
             name: "Push Day",
             exercises: [
                 WorkoutExercise(
-                    exercise: exerciseLibrary.first { $0.name == "Bench Press" }!,
+                    exercise: benchPress,
                     sets: [
                         Set(reps: 10, weight: 60, order: 1),
                         Set(reps: 8, weight: 70, order: 2),
@@ -265,7 +280,7 @@ class DataManager: ObservableObject {
                     order: 1
                 ),
                 WorkoutExercise(
-                    exercise: exerciseLibrary.first { $0.name == "Dumbbell Press" }!,
+                    exercise: dumbbellPress,
                     sets: [
                         Set(reps: 12, weight: 25, order: 1),
                         Set(reps: 10, weight: 30, order: 2),

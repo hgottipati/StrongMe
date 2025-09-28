@@ -239,6 +239,9 @@ struct WorkoutsView: View {
                     Button(action: {
                         print("DEBUG: WorkoutsView - Toggling reorder mode from \(isReorderMode) to \(!isReorderMode)")
                         print("DEBUG: WorkoutsView - Current workouts count: \(dataManager.workouts.count)")
+                        for (index, workout) in dataManager.workouts.enumerated() {
+                            print("DEBUG: WorkoutsView - Workout \(index): \(workout.name)")
+                        }
                         isReorderMode.toggle()
                     }) {
                         Image(systemName: isReorderMode ? "checkmark" : "arrow.up.arrow.down")
@@ -884,9 +887,6 @@ struct AdhocWorkoutsView: View {
                         .foregroundColor(.secondary)
                         .padding()
                 }
-                .onAppear {
-                    print("DEBUG: AdhocWorkoutsView - Reorder mode onAppear (empty) - Workouts count: \(dataManager.workouts.count)")
-                }
             } else {
                 List {
                     ForEach(dataManager.workouts) { workout in
@@ -917,9 +917,6 @@ struct AdhocWorkoutsView: View {
                 }
                 .listStyle(PlainListStyle())
                 .environment(\.editMode, .constant(.active))
-                .onAppear {
-                    print("DEBUG: AdhocWorkoutsView - Reorder mode onAppear (list) - Workouts count: \(dataManager.workouts.count)")
-                }
             }
         } else {
             // Normal mode - show modern cards
@@ -948,8 +945,11 @@ struct AdhocWorkoutsView: View {
                     )
                 }
             }
-            .onAppear {
-                print("DEBUG: AdhocWorkoutsView - Normal mode onAppear - Workouts count: \(dataManager.workouts.count)")
+        }
+        .onAppear {
+            print("DEBUG: AdhocWorkoutsView - onAppear - isReorderMode: \(isReorderMode), Workouts count: \(dataManager.workouts.count)")
+            for (index, workout) in dataManager.workouts.enumerated() {
+                print("DEBUG: AdhocWorkoutsView - Workout \(index): \(workout.name)")
             }
         }
     }
