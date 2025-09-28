@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 enum WorkoutTab: String, CaseIterable {
     case adhoc = "Adhoc"
@@ -18,9 +17,8 @@ struct WorkoutsView: View {
     @State private var showingShareSheet = false
     @State private var workoutToShare: Workout?
     
-    // Drag and drop state
-    @State private var draggedWorkout: Workout? = nil
-    @State private var dragOffset: CGSize = .zero
+    // Reorder state
+    @State private var isReorderMode = false
     
     // Tab state
     @State private var selectedTab: WorkoutTab = .adhoc
@@ -217,7 +215,15 @@ struct WorkoutsView: View {
                             
                             // Content based on selected tab
                             if selectedTab == .adhoc {
-                                AdhocWorkoutsView(draggedWorkout: $draggedWorkout, dragOffset: $dragOffset, selectedWorkout: $selectedWorkout, showingWorkoutOverview: $showingWorkoutOverview)
+                                AdhocWorkoutsView(
+                                    isReorderMode: $isReorderMode,
+                                    selectedWorkout: $selectedWorkout,
+                                    showingWorkoutOverview: $showingWorkoutOverview,
+                                    onShareWorkout: shareWorkout,
+                                    onDuplicateWorkout: duplicateWorkout,
+                                    onEditWorkout: editWorkout,
+                                    onDeleteWorkout: deleteWorkout
+                                )
                             } else {
                                 RoutinesView()
                             }
@@ -229,6 +235,17 @@ struct WorkoutsView: View {
             }
             .navigationTitle("Workouts")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        print("DEBUG: WorkoutsView - Toggling reorder mode from \(isReorderMode) to \(!isReorderMode)")
+                        print("DEBUG: WorkoutsView - Current workouts count: \(dataManager.workouts.count)")
+                        isReorderMode.toggle()
+                    }) {
+                        Image(systemName: isReorderMode ? "checkmark" : "arrow.up.arrow.down")
+                            .foregroundColor(isReorderMode ? .green : .blue)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         showingNewWorkout = true
@@ -642,22 +659,6 @@ struct ModernWorkoutCardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Header with title, date, and menu
                 HStack {
-                    // Enhanced drag handle indicator
-                    VStack(spacing: 3) {
-                        ForEach(0..<3) { _ in
-                            HStack(spacing: 2) {
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.secondary.opacity(0.6))
-                                    .frame(width: 3, height: 3)
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.secondary.opacity(0.6))
-                                    .frame(width: 3, height: 3)
-                            }
-                        }
-                    }
-                    .padding(.trailing, 12)
-                    .padding(.vertical, 4)
-                    
                     VStack(alignment: .leading, spacing: 4) {
                         Text(workout.name)
                             .font(.title3)
@@ -821,7 +822,6 @@ struct ModernWorkoutCardView: View {
     }
 }
 
-// MARK: - Workout Drop Delegate (Removed - using custom DragGesture instead)
 
 // MARK: - Tab Interface
 struct TabInterface: View {
@@ -862,136 +862,113 @@ struct TabInterface: View {
 // MARK: - Adhoc Workouts View
 struct AdhocWorkoutsView: View {
     @EnvironmentObject var dataManager: DataManager
-    @Binding var draggedWorkout: Workout?
-    @Binding var dragOffset: CGSize
+    @Binding var isReorderMode: Bool
     @Binding var selectedWorkout: Workout?
     @Binding var showingWorkoutOverview: Workout?
-    @State private var hasDragged: Bool = false
-    @State private var lastReorderIndex: Int? = nil
-    @State private var initialDragOffset: CGFloat = 0
+    
+    // Callback functions from parent
+    let onShareWorkout: (Workout) -> Void
+    let onDuplicateWorkout: (Workout) -> Void
+    let onEditWorkout: (Workout) -> Void
+    let onDeleteWorkout: (Workout) -> Void
     
     var body: some View {
-        LazyVStack(spacing: 16) {
-            ForEach(Array(dataManager.workouts.enumerated()), id: \.element.id) { index, workout in
-                ModernWorkoutCardView(
-                    workout: workout,
-                    onTap: {
-                        // Only open if we haven't dragged
-                        if !hasDragged {
-                            selectedWorkout = workout
-                        }
-                    },
-                    onStartWorkout: {
-                        startWorkout(workout)
-                    },
-                    onShare: {
-                        shareWorkout(workout)
-                    },
-                    onDuplicate: {
-                        duplicateWorkout(workout)
-                    },
-                    onEdit: {
-                        editWorkout(workout)
-                    },
-                    onDelete: {
-                        deleteWorkout(workout)
-                    }
-                )
-                .offset(draggedWorkout?.id == workout.id ? dragOffset : .zero)
-                .scaleEffect(draggedWorkout?.id == workout.id ? 1.05 : 1.0)
-                .opacity(draggedWorkout?.id == workout.id ? 0.8 : 1.0)
-                .zIndex(draggedWorkout?.id == workout.id ? 1 : 0)
-                .gesture(
-                    DragGesture(minimumDistance: 10)
-                        .onChanged { value in
-                            print("DEBUG: DragGesture onChanged - translation: \(value.translation)")
+        let _ = print("DEBUG: AdhocWorkoutsView - body called - isReorderMode: \(isReorderMode), workouts count: \(dataManager.workouts.count)")
+        
+        if isReorderMode {
+            // Reorder mode - show simple list with reordering
+            if dataManager.workouts.isEmpty {
+                VStack {
+                    Text("No workouts to reorder")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .padding()
+                }
+                .onAppear {
+                    print("DEBUG: AdhocWorkoutsView - Reorder mode onAppear (empty) - Workouts count: \(dataManager.workouts.count)")
+                }
+            } else {
+                List {
+                    ForEach(dataManager.workouts) { workout in
+                        HStack {
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundColor(.secondary)
+                                .padding(.trailing, 8)
                             
-                            // Mark that we've started dragging
-                            if !hasDragged {
-                                hasDragged = true
-                                draggedWorkout = workout
-                                initialDragOffset = value.translation.height
-                                lastReorderIndex = nil
-                                print("DEBUG: Drag started for workout: \(workout.name)")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(workout.name)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
                                 
-                                // Provide haptic feedback when drag starts
-                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                impactFeedback.impactOccurred()
+                                Text(workout.date, style: .date)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
                             }
                             
-                            // Only allow vertical movement (constrain X to 0)
-                            let constrainedOffset = CGSize(width: 0, height: value.translation.height)
-                            dragOffset = constrainedOffset
+                            Spacer()
                             
-                            // Check if we should reorder based on vertical position
-                            checkForReorder(dragOffset: constrainedOffset, currentIndex: index)
+                            Text("\(workout.exercises.count) exercises")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .onEnded { value in
-                            print("DEBUG: DragGesture onEnded - final translation: \(value.translation)")
-                            
-                            // Reset drag state
-                            draggedWorkout = nil
-                            dragOffset = .zero
-                            hasDragged = false
-                            lastReorderIndex = nil
-                            initialDragOffset = 0
-                            
-                            // Provide success feedback
-                            let successFeedback = UINotificationFeedbackGenerator()
-                            successFeedback.notificationOccurred(.success)
-                            
-                            // Save the changes
-                            dataManager.saveWorkoutsDirectly(dataManager.workouts)
+                        .padding(.vertical, 8)
+                    }
+                    .onMove(perform: moveWorkouts)
+                }
+                .listStyle(PlainListStyle())
+                .environment(\.editMode, .constant(.active))
+                .onAppear {
+                    print("DEBUG: AdhocWorkoutsView - Reorder mode onAppear (list) - Workouts count: \(dataManager.workouts.count)")
+                }
+            }
+        } else {
+            // Normal mode - show modern cards
+            LazyVStack(spacing: 16) {
+                ForEach(dataManager.workouts) { workout in
+                    ModernWorkoutCardView(
+                        workout: workout,
+                        onTap: {
+                            selectedWorkout = workout
+                        },
+                        onStartWorkout: {
+                            startWorkout(workout)
+                        },
+                        onShare: {
+                            onShareWorkout(workout)
+                        },
+                        onDuplicate: {
+                            onDuplicateWorkout(workout)
+                        },
+                        onEdit: {
+                            onEditWorkout(workout)
+                        },
+                        onDelete: {
+                            onDeleteWorkout(workout)
                         }
-                )
+                    )
+                }
+            }
+            .onAppear {
+                print("DEBUG: AdhocWorkoutsView - Normal mode onAppear - Workouts count: \(dataManager.workouts.count)")
             }
         }
     }
     
-    private func checkForReorder(dragOffset: CGSize, currentIndex: Int) {
-        guard let draggedWorkout = draggedWorkout else { return }
+    private func moveWorkouts(from source: IndexSet, to destination: Int) {
+        print("DEBUG: AdhocWorkoutsView - Moving workouts from \(source) to \(destination)")
         
-        // Calculate the threshold for reordering (smaller threshold for better responsiveness)
-        let reorderThreshold: CGFloat = 50
+        // Provide haptic feedback for successful reordering
+        let successFeedback = UINotificationFeedbackGenerator()
+        successFeedback.notificationOccurred(.success)
         
-        // Debug logging
-        print("DEBUG: checkForReorder - dragOffset.height: \(dragOffset.height), threshold: \(reorderThreshold), currentIndex: \(currentIndex)")
-        
-        // Check if the dragged card has moved enough to trigger a reorder
-        if abs(dragOffset.height) > reorderThreshold {
-            // Calculate new position based on drag direction
-            let newIndex: Int
-            if dragOffset.height < -reorderThreshold {
-                // Moving up - move to previous position
-                newIndex = max(0, currentIndex - 1)
-                print("DEBUG: Moving UP - currentIndex: \(currentIndex), newIndex: \(newIndex)")
-            } else if dragOffset.height > reorderThreshold {
-                // Moving down - move to next position
-                newIndex = min(dataManager.workouts.count - 1, currentIndex + 1)
-                print("DEBUG: Moving DOWN - currentIndex: \(currentIndex), newIndex: \(newIndex)")
-            } else {
-                return // No reorder needed
-            }
-            
-            // Only reorder if the new position is different and valid, and we haven't already reordered to this position
-            if newIndex != currentIndex && newIndex >= 0 && newIndex < dataManager.workouts.count && lastReorderIndex != newIndex {
-                print("DEBUG: Performing reorder from \(currentIndex) to \(newIndex)")
-                
-                // Perform the reorder with animation
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    dataManager.workouts.move(fromOffsets: IndexSet(integer: currentIndex), toOffset: newIndex)
-                }
-                
-                // Provide haptic feedback for reorder
-                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                impactFeedback.impactOccurred()
-                
-                // Update last reorder index to prevent duplicate reorders
-                lastReorderIndex = newIndex
-            } else {
-                print("DEBUG: Reorder skipped - newIndex: \(newIndex), currentIndex: \(currentIndex), lastReorderIndex: \(lastReorderIndex ?? -1)")
-            }
+        // Perform the move with smooth animation
+        withAnimation(.easeInOut(duration: 0.3)) {
+            dataManager.workouts.move(fromOffsets: source, toOffset: destination)
         }
+        
+        // Save the changes
+        dataManager.saveWorkoutsDirectly(dataManager.workouts)
+        print("DEBUG: AdhocWorkoutsView - Workouts reordered successfully")
     }
     
     private func startWorkout(_ workout: Workout) {
@@ -1080,49 +1057,6 @@ struct AdhocWorkoutsView: View {
             // Navigate to active workout view
             showingWorkoutOverview = activeWorkout
         }
-    }
-    
-    private func shareWorkout(_ workout: Workout) {
-        // Implementation for sharing workout
-    }
-    
-    private func duplicateWorkout(_ workout: Workout) {
-        let duplicatedWorkout = Workout(
-            name: "\(workout.name) Copy",
-            exercises: workout.exercises.map { exercise in
-                WorkoutExercise(
-                    exercise: exercise.exercise,
-                    sets: exercise.sets.map { set in
-                        Set(
-                            reps: set.reps,
-                            weight: nil, // Reset weight for new workout
-                            duration: set.duration,
-                            distance: set.distance,
-                            restTime: set.restTime,
-                            isCompleted: false, // Reset completion status
-                            order: set.order
-                        )
-                    },
-                    notes: exercise.notes,
-                    order: exercise.order
-                )
-            },
-            date: Date(),
-            duration: nil,
-            notes: workout.notes,
-            isTemplate: false
-        )
-        
-        dataManager.addWorkout(duplicatedWorkout)
-    }
-    
-    private func editWorkout(_ workout: Workout) {
-        // Implementation for editing workout
-    }
-    
-    private func deleteWorkout(_ workout: Workout) {
-        dataManager.deleteWorkout(workout)
-        print("DEBUG: AdhocWorkoutsView - Deleted workout: \(workout.name)")
     }
 }
 

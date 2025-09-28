@@ -17,6 +17,7 @@ class DataManager: ObservableObject {
     @Published var currentWorkout: Workout?
     
     private let persistenceManager = PersistenceManager.shared
+    private var hasLoadedSampleData = false
     
     init() {
         loadData()
@@ -137,6 +138,9 @@ class DataManager: ObservableObject {
     }
     
     private func ensureSampleDataExists() {
+        // Only load sample data once
+        guard !hasLoadedSampleData else { return }
+        
         // Check if we have any workouts with Bench Press or Push-ups
         let hasBenchPress = workouts.contains { workout in
             workout.exercises.contains { $0.exercise.name == "Bench Press" }
@@ -152,6 +156,7 @@ class DataManager: ObservableObject {
         if !hasBenchPress || !hasPushUps {
             print("DEBUG: Adding sample data for previous values")
             loadSampleWorkouts()
+            hasLoadedSampleData = true
             print("DEBUG: DataManager - After adding sample data, total workouts: \(workouts.count)")
         }
     }
@@ -216,6 +221,9 @@ class DataManager: ObservableObject {
     private func loadSampleWorkouts() {
         print("DEBUG: DataManager - Loading sample workouts")
         
+        // Clear existing workouts first to prevent duplicates
+        workouts.removeAll()
+        
         // Add a previous workout from 2 days ago
         let previousWorkout = Workout(
             name: "Previous Push Day",
@@ -274,6 +282,9 @@ class DataManager: ObservableObject {
         for (index, workout) in workouts.enumerated() {
             print("DEBUG: DataManager - Workout \(index): \(workout.name) on \(workout.date)")
         }
+        
+        // Save the workouts to persistence
+        saveWorkoutsDirectly(workouts)
     }
     
     private func loadSampleUser() {
