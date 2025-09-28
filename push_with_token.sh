@@ -42,7 +42,7 @@ echo "✅ Pre-push checks completed successfully"
 
 # Get token and push
 echo "🚀 Pushing to GitHub..."
-TOKEN=$(cat ../.git_token)
+TOKEN=$(cat .git_token)
 if git push https://hgottipati:$TOKEN@github.com/hgottipati/StrongMe.git main; then
     echo "✅ Successfully pushed to GitHub!"
 else
